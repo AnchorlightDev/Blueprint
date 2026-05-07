@@ -1,0 +1,166 @@
+package dev.anchorlight.blueprint;
+
+import dev.anchorlight.blueprint.command.BlueprintCommand;
+import dev.anchorlight.blueprint.command.subcommand.*;
+import dev.anchorlight.blueprint.config.BlueprintConfig;
+import dev.anchorlight.blueprint.database.BlueprintStorage;
+import dev.anchorlight.blueprint.database.SQLiteBlueprintStorage;
+import dev.anchorlight.blueprint.database.StorageException;
+import dev.anchorlight.blueprint.listener.ProtectionListener;
+import dev.anchorlight.blueprint.listener.SessionListener;
+import dev.anchorlight.blueprint.service.CloneService;
+import dev.anchorlight.blueprint.service.OperationLockService;
+import dev.anchorlight.blueprint.service.SnapshotService;
+import dev.anchorlight.blueprint.service.WorldService;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Blueprint – modern build-server world management plugin for Paper.
+ *
+ * <p>Bootstrap order:
+ * <ol>
+ *   <li>Save default config</li>
+ *   <li>Initialize storage (SQLite + HikariCP)</li>
+ *   <li>Initialize services</li>
+ *   <li>Register commands</li>
+ *   <li>Register listeners</li>
+ * </ol>
+ */
+public class BlueprintPlugin extends JavaPlugin {
+
+    private BlueprintConfig blueprintConfig;
+    private BlueprintStorage storage;
+    private WorldService worldService;
+    private CloneService cloneService;
+    private SnapshotService snapshotService;
+    private OperationLockService opLocks;
+
+    /** Single-threaded executor for all async file I/O. */
+    private ExecutorService ioExecutor;
+
+    @Override
+    public void onEnable() {
+        // ── 1. Configuration ──────────────────────────────────────────────
+        saveDefaultConfig();
+        blueprintConfig = new BlueprintConfig(getConfig());
+
+        // ── 2. Data folder ────────────────────────────────────────────────
+        if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
+            getLogger().severe("Failed to create plugin data folder! Disabling Blueprint.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // Snapshot folder
+        File snapshotDir = new File(getDataFolder(), "snapshots");
+        if (!snapshotDir.exists() && !snapshotDir.mkdirs()) {
+            getLogger().warning("Could not create snapshots directory.");
+        }
+
+        // ── 3. Storage ────────────────────────────────────────────────────
+        File dbFile = new File(getDataFolder(), "blueprint.db");
+        storage = new SQLiteBlueprintStorage(dbFile, getLogger());
+        try {
+            storage.initializeSchema();
+        } catch (StorageException e) {
+            getLogger().severe("Failed to initialize database: " + e.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // ── 4. Services ───────────────────────────────────────────────────
+        ioExecutor     = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "Blueprint-IO");
+            t.setDaemon(true);
+            return t;
+        });
+        opLocks        = new OperationLockService();
+        worldService   = new WorldService(this, storage, blueprintConfig, opLocks);
+        cloneService   = new CloneService(this, storage, blueprintConfig, worldService, opLocks);
+        snapshotService = new SnapshotService(this, storage, blueprintConfig, worldService, opLocks);
+
+        // ── 5. Commands ───────────────────────────────────────────────────
+        BlueprintCommand dispatcher = new BlueprintCommand(blueprintConfig);
+        dispatcher.register(new HelpCommand(dispatcher, blueprintConfig));
+        dispatcher.register(new VersionCommand(this, blueprintConfig));
+        dispatcher.register(new CreateCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new ListCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new TpCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new OpenCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new CloseCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new LockCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new UnlockCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new CloneCommand(cloneService, blueprintConfig, getLogger()));
+        dispatcher.register(new SnapshotCommand(snapshotService, blueprintConfig, getLogger()));
+        dispatcher.register(new DeleteCommand(worldService, opLocks, blueprintConfig, getLogger()));
+
+        PluginCommand cmd = getCommand("blueprint");
+        if (cmd != null) {
+            cmd.setExecutor(dispatcher);
+            cmd.setTabCompleter(dispatcher);
+        } else {
+            getLogger().severe("Could not register /blueprint command! Check plugin.yml.");
+        }
+
+        // ── 6. Listeners ──────────────────────────────────────────────────
+        getServer().getPluginManager().registerEvents(
+                new ProtectionListener(storage, getLogger()), this);
+        getServer().getPluginManager().registerEvents(
+                new SessionListener(this, storage, blueprintConfig, getLogger()), this);
+
+        // ── 7. Restore world state from previous session ──────────────────
+        // Worlds marked OPEN/LOCKED in the DB are not auto-loaded by Bukkit on
+        // restart (they are not in server.properties). Re-load them now so that
+        // the in-memory state matches what the DB says.
+        try {
+            worldService.restoreOpenWorlds();
+        } catch (StorageException e) {
+            getLogger().warning("[Blueprint] Could not restore world state on startup: " + e.getMessage());
+        }
+
+        // ── 8. Done ───────────────────────────────────────────────────────
+        getLogger().info("Blueprint v" + getDescription().getVersion() + " enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        // Shut down IO executor gracefully
+        if (ioExecutor != null && !ioExecutor.isShutdown()) {
+            ioExecutor.shutdown();
+            try {
+                if (!ioExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    getLogger().warning("IO executor did not terminate cleanly within 10s; forcing shutdown.");
+                    ioExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                ioExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Close database connections
+        if (storage != null) {
+            storage.close();
+        }
+
+        getLogger().info("Blueprint disabled.");
+    }
+
+    // ── Accessors for services ─────────────────────────────────────────────
+
+    public BlueprintConfig getBlueprintConfig() { return blueprintConfig; }
+    public BlueprintStorage getStorage() { return storage; }
+    public WorldService getWorldService() { return worldService; }
+    public CloneService getCloneService() { return cloneService; }
+    public SnapshotService getSnapshotService() { return snapshotService; }
+    public OperationLockService getOpLocks() { return opLocks; }
+
+    /** The shared IO executor for all async file operations. */
+    public ExecutorService getIoExecutor() { return ioExecutor; }
+}

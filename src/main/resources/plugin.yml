@@ -1,0 +1,87 @@
+name: Blueprint
+version: '0.1.0'
+main: dev.anchorlight.blueprint.BlueprintPlugin
+api-version: '1.21'
+description: Modern build-server world management plugin for Paper
+authors:
+  - Anchorlight
+website: https://github.com/anchorlightdev/blueprint
+
+commands:
+  blueprint:
+    description: Blueprint world management command
+    usage: /blueprint <subcommand> [args...]
+    aliases:
+      - bp
+    permission: blueprint.command.help
+
+permissions:
+  blueprint.admin:
+    description: Grants all Blueprint permissions
+    default: op
+    children:
+      blueprint.command.help: true
+      blueprint.command.version: true
+      blueprint.command.create: true
+      blueprint.command.list: true
+      blueprint.command.teleport: true
+      blueprint.command.open: true
+      blueprint.command.close: true
+      blueprint.command.lock: true
+      blueprint.command.unlock: true
+      blueprint.command.clone: true
+      blueprint.command.snapshot: true
+      blueprint.command.delete: true
+      blueprint.bypass.lock: true
+
+  blueprint.command.help:
+    description: View Blueprint help
+    default: op
+
+  blueprint.command.version:
+    description: View Blueprint version info
+    default: op
+
+  blueprint.command.create:
+    description: Create a new build world
+    default: op
+
+  blueprint.command.list:
+    description: List managed worlds
+    default: op
+
+  blueprint.command.teleport:
+    description: Teleport to a build world
+    default: op
+
+  blueprint.command.open:
+    description: Open a build world
+    default: op
+
+  blueprint.command.close:
+    description: Close a build world
+    default: op
+
+  blueprint.command.lock:
+    description: Lock a build world
+    default: op
+
+  blueprint.command.unlock:
+    description: Unlock a build world
+    default: op
+
+  blueprint.command.clone:
+    description: Clone a world
+    default: op
+
+  blueprint.command.snapshot:
+    description: Manage world snapshots
+    default: op
+
+  blueprint.command.delete:
+    description: Delete a build world
+    default: op
+
+  blueprint.bypass.lock:
+    description: Bypass locked-world protections
+    default: op

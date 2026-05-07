@@ -1,0 +1,34 @@
+# Blueprint Configuration
+# https://github.com/anchorlightdev/blueprint
+
+storage:
+  # Currently only "sqlite" is supported
+  type: sqlite
+
+worlds:
+  # Prefix applied to Bukkit world folder names (e.g. blueprint_myworld)
+  folder-prefix: "blueprint_"
+  # Number of worlds shown per /blueprint list page
+  page-size: 10
+  # World to send players to when a world is unloaded/closed
+  fallback-world: "world"
+  # Automatically load (open) worlds immediately after creation
+  auto-open-created-worlds: true
+  # Automatically load (open) clone targets after cloning completes
+  auto-open-clones: true
+
+snapshots:
+  enabled: true
+  # Create an automatic backup snapshot before restoring
+  auto-backup-before-restore: true
+  # Maximum snapshots stored per world (oldest is pruned first, 0 = unlimited)
+  max-per-world: 25
+
+safety:
+  # Require the "confirm" keyword for /blueprint delete
+  require-delete-confirmation: true
+  # Regex that world names must match
+  allowed-world-name-regex: "^[a-z0-9_-]{3,32}$"
+
+messages:
+  prefix: "<gradient:#00aaff:#0066ff><bold>Blueprint</bold></gradient> <dark_gray>»</dark_gray> "

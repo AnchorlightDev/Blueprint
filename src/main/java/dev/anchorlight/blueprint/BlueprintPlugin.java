@@ -111,7 +111,17 @@ public class BlueprintPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new ProtectionListener(storage, getLogger()), this);
 
-        // ── 7. Done ───────────────────────────────────────────────────────
+        // ── 7. Restore world state from previous session ──────────────────
+        // Worlds marked OPEN/LOCKED in the DB are not auto-loaded by Bukkit on
+        // restart (they are not in server.properties). Re-load them now so that
+        // the in-memory state matches what the DB says.
+        try {
+            worldService.restoreOpenWorlds();
+        } catch (StorageException e) {
+            getLogger().warning("[Blueprint] Could not restore world state on startup: " + e.getMessage());
+        }
+
+        // ── 8. Done ───────────────────────────────────────────────────────
         getLogger().info("Blueprint v" + getDescription().getVersion() + " enabled.");
     }
 

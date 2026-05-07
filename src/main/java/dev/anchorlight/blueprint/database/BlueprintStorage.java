@@ -29,6 +29,9 @@ public interface BlueprintStorage {
 
     List<WorldMetadata> listWorlds(int page, int pageSize) throws StorageException;
 
+    /** Returns every world record with no pagination — used for startup recovery. */
+    List<WorldMetadata> listAllWorlds() throws StorageException;
+
     void deleteWorld(@NotNull String name) throws StorageException;
 
     // ── Snapshot operations ───────────────────────────────────────────────

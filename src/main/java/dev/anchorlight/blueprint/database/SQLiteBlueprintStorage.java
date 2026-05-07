@@ -167,6 +167,20 @@ public class SQLiteBlueprintStorage implements BlueprintStorage {
     }
 
     @Override
+    public List<WorldMetadata> listAllWorlds() throws StorageException {
+        String sql = "SELECT * FROM blueprint_worlds ORDER BY created_at DESC";
+        List<WorldMetadata> result = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) result.add(mapWorld(rs));
+        } catch (SQLException e) {
+            throw new StorageException("Failed to list all worlds", e);
+        }
+        return result;
+    }
+
+    @Override
     public void deleteWorld(@NotNull String name) throws StorageException {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement("DELETE FROM blueprint_worlds WHERE name = ?")) {

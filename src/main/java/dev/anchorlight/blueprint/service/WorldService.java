@@ -128,7 +128,8 @@ public class WorldService {
 
     /**
      * Teleports a player to the spawn of the named world.
-     * The world must be open (loaded).
+     * The world must be OPEN or LOCKED. If it is marked open in the DB but not
+     * actually loaded (e.g. after a server restart), it is auto-loaded first.
      */
     public void teleport(@NotNull Player player, @NotNull String name) throws StorageException {
         WorldMetadata meta = requireWorld(name);
@@ -139,14 +140,27 @@ public class WorldService {
 
         World world = Bukkit.getWorld(meta.getFolderName());
         if (world == null) {
-            throw new IllegalStateException("World '" + name + "' is not loaded.");
+            // DB says OPEN/LOCKED but Bukkit doesn't have it — recover by loading it now.
+            // This can happen after a server restart since Blueprint worlds aren't in
+            // server.properties and won't auto-load with Bukkit.
+            if (!Bukkit.isPrimaryThread()) {
+                // Must load on main thread; schedule and abort this call — the player
+                // should re-issue the command. We inform them below.
+                plugin.getServer().getScheduler().runTask(plugin, () -> loadBukkitWorld(meta));
+                throw new IllegalStateException("World '" + name + "' was loading, try again in a moment.");
+            }
+            loadBukkitWorld(meta);
+            world = Bukkit.getWorld(meta.getFolderName());
+            if (world == null) {
+                throw new IllegalStateException("World '" + name + "' could not be loaded.");
+            }
         }
 
-        // Teleport must happen on main thread
+        final World finalWorld = world;
         if (Bukkit.isPrimaryThread()) {
-            player.teleport(world.getSpawnLocation());
+            player.teleport(finalWorld.getSpawnLocation());
         } else {
-            plugin.getServer().getScheduler().runTask(plugin, () -> player.teleport(world.getSpawnLocation()));
+            plugin.getServer().getScheduler().runTask(plugin, () -> player.teleport(finalWorld.getSpawnLocation()));
         }
     }
 
@@ -218,21 +232,58 @@ public class WorldService {
     }
 
     /**
-     * Loads the world into Bukkit.
+     * Loads the world into Bukkit and applies build-server defaults (no mobs).
      * <strong>Must be called on the main thread.</strong>
      */
     void loadBukkitWorld(@NotNull WorldMetadata meta) {
         World existing = Bukkit.getWorld(meta.getFolderName());
-        if (existing != null) return; // already loaded
+        if (existing != null) {
+            applyBuildWorldRules(existing);
+            return;
+        }
 
         WorldCreator creator = new WorldCreator(meta.getFolderName());
-        // If this is a fresh world with no folder yet, use FLAT for build servers
+        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type
         File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
         if (!folder.exists()) {
             creator.type(WorldType.FLAT);
             creator.generateStructures(false);
         }
-        creator.createWorld();
+        World world = creator.createWorld();
+        if (world != null) {
+            applyBuildWorldRules(world);
+        }
+    }
+
+    /**
+     * Applies build-server world rules: disables mob spawning and weather changes
+     * so freshly loaded or newly created worlds are immediately safe to build in.
+     * <strong>Must be called on the main thread.</strong>
+     */
+    private void applyBuildWorldRules(@NotNull World world) {
+        world.setSpawnFlags(false, false); // monsters=false, animals=false
+        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(org.bukkit.GameRule.DO_PATROL_SPAWNING, false);
+        world.setGameRule(org.bukkit.GameRule.DO_TRADER_SPAWNING, false);
+    }
+
+    /**
+     * Re-loads all worlds that were OPEN or LOCKED when the server last stopped.
+     * Call this during plugin startup after services are ready.
+     * <strong>Must be called on the main thread.</strong>
+     */
+    public void restoreOpenWorlds() throws StorageException {
+        List<WorldMetadata> all = storage.listAllWorlds();
+        int count = 0;
+        for (WorldMetadata meta : all) {
+            if (meta.getStatus() == WorldStatus.OPEN || meta.getStatus() == WorldStatus.LOCKED) {
+                loadBukkitWorld(meta);
+                count++;
+            }
+        }
+        if (count > 0) {
+            logger.info("[Blueprint] Restored " + count + " world(s) from previous session.");
+        }
     }
 
     /**

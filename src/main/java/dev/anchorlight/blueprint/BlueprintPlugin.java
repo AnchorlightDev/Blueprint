@@ -7,6 +7,7 @@ import dev.anchorlight.blueprint.database.BlueprintStorage;
 import dev.anchorlight.blueprint.database.SQLiteBlueprintStorage;
 import dev.anchorlight.blueprint.database.StorageException;
 import dev.anchorlight.blueprint.listener.ProtectionListener;
+import dev.anchorlight.blueprint.listener.SessionListener;
 import dev.anchorlight.blueprint.service.CloneService;
 import dev.anchorlight.blueprint.service.OperationLockService;
 import dev.anchorlight.blueprint.service.SnapshotService;
@@ -110,6 +111,8 @@ public class BlueprintPlugin extends JavaPlugin {
         // ── 6. Listeners ──────────────────────────────────────────────────
         getServer().getPluginManager().registerEvents(
                 new ProtectionListener(storage, getLogger()), this);
+        getServer().getPluginManager().registerEvents(
+                new SessionListener(this, storage, blueprintConfig, getLogger()), this);
 
         // ── 7. Restore world state from previous session ──────────────────
         // Worlds marked OPEN/LOCKED in the DB are not auto-loaded by Bukkit on

@@ -25,6 +25,7 @@ permissions:
       blueprint.command.create: true
       blueprint.command.list: true
       blueprint.command.teleport: true
+      blueprint.command.hub: true
       blueprint.command.open: true
       blueprint.command.close: true
       blueprint.command.lock: true
@@ -53,6 +54,10 @@ permissions:
   blueprint.command.teleport:
     description: Teleport to a build world
     default: op
+
+  blueprint.command.hub:
+    description: Return to the hub world
+    default: true
 
   blueprint.command.open:
     description: Open a build world

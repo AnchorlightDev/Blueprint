@@ -14,6 +14,7 @@ public class BlueprintConfig {
     private final String worldFolderPrefix;
     private final int pageSize;
     private final String fallbackWorld;
+    private final String hubWorld;
     private final boolean autoOpenCreatedWorlds;
     private final boolean autoOpenClones;
 
@@ -30,6 +31,7 @@ public class BlueprintConfig {
         worldFolderPrefix     = cfg.getString("worlds.folder-prefix", "blueprint_");
         pageSize              = cfg.getInt("worlds.page-size", 10);
         fallbackWorld         = cfg.getString("worlds.fallback-world", "world");
+        hubWorld              = cfg.getString("worlds.hub-world", fallbackWorld);
         autoOpenCreatedWorlds = cfg.getBoolean("worlds.auto-open-created-worlds", true);
         autoOpenClones        = cfg.getBoolean("worlds.auto-open-clones", true);
 
@@ -48,6 +50,7 @@ public class BlueprintConfig {
     public String getWorldFolderPrefix() { return worldFolderPrefix; }
     public int getPageSize() { return pageSize; }
     public String getFallbackWorld() { return fallbackWorld; }
+    public String getHubWorld() { return hubWorld; }
     public boolean isAutoOpenCreatedWorlds() { return autoOpenCreatedWorlds; }
     public boolean isAutoOpenClones() { return autoOpenClones; }
 

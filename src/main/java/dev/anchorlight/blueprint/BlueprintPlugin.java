@@ -6,6 +6,7 @@ import dev.anchorlight.blueprint.config.BlueprintConfig;
 import dev.anchorlight.blueprint.database.BlueprintStorage;
 import dev.anchorlight.blueprint.database.SQLiteBlueprintStorage;
 import dev.anchorlight.blueprint.database.StorageException;
+import dev.anchorlight.blueprint.listener.PortalListener;
 import dev.anchorlight.blueprint.listener.ProtectionListener;
 import dev.anchorlight.blueprint.listener.SessionListener;
 import dev.anchorlight.blueprint.service.CloneService;
@@ -92,6 +93,7 @@ public class BlueprintPlugin extends JavaPlugin {
         dispatcher.register(new CreateCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new ListCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new TpCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new HubCommand(blueprintConfig));
         dispatcher.register(new OpenCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new CloseCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new LockCommand(worldService, blueprintConfig, getLogger()));
@@ -111,6 +113,7 @@ public class BlueprintPlugin extends JavaPlugin {
         // ── 6. Listeners ──────────────────────────────────────────────────
         getServer().getPluginManager().registerEvents(
                 new ProtectionListener(storage, getLogger()), this);
+        getServer().getPluginManager().registerEvents(new PortalListener(), this);
         getServer().getPluginManager().registerEvents(
                 new SessionListener(this, storage, blueprintConfig, getLogger()), this);
 

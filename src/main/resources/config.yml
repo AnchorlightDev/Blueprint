@@ -12,6 +12,8 @@ worlds:
   page-size: 10
   # World to send players to when a world is unloaded/closed
   fallback-world: "world"
+  # World players are sent to with /blueprint hub (defaults to fallback-world)
+  hub-world: "world"
   # Automatically load (open) worlds immediately after creation
   auto-open-created-worlds: true
   # Automatically load (open) clone targets after cloning completes

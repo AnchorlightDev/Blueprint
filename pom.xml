@@ -53,14 +53,25 @@
             <artifactId>HikariCP</artifactId>
             <version>${hikaricp.version}</version>
             <scope>compile</scope>
+            <!-- Exclude HikariCP's transitive SLF4J; Paper provides it at runtime -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
-        <!-- SLF4J for HikariCP logging (nop at runtime since Paper provides its own) -->
+        <!--
+          SLF4J is provided by the Paper server at runtime.
+          Declaring it here as "provided" allows HikariCP to compile and run
+          without us bundling a duplicate or conflicting copy.
+        -->
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-nop</artifactId>
+            <artifactId>slf4j-api</artifactId>
             <version>2.0.16</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -85,6 +96,12 @@
                 <version>${shade.plugin.version}</version>
                 <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <artifactSet>
+                        <excludes>
+                            <!-- SLF4J is provided by Paper at runtime; never bundle it -->
+                            <exclude>org.slf4j:*</exclude>
+                        </excludes>
+                    </artifactSet>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
@@ -98,17 +115,18 @@
                         </filter>
                     </filters>
                     <relocations>
+                        <!--
+                          Relocate HikariCP to avoid classloader conflicts if another plugin
+                          bundles a different HikariCP version in the same server.
+                          sqlite-jdbc is NOT relocated because its native JNI library uses
+                          class-name-derived symbol names; relocating the Java package would
+                          break the JNI binding (UnsatisfiedLinkError).
+                          SLF4J is NOT relocated because Paper provides it at runtime; we
+                          want HikariCP's log calls to go through Paper's SLF4J binding.
+                        -->
                         <relocation>
                             <pattern>com.zaxxer.hikari</pattern>
                             <shadedPattern>dev.anchorlight.blueprint.libs.hikari</shadedPattern>
-                        </relocation>
-                        <relocation>
-                            <pattern>org.sqlite</pattern>
-                            <shadedPattern>dev.anchorlight.blueprint.libs.sqlite</shadedPattern>
-                        </relocation>
-                        <relocation>
-                            <pattern>org.slf4j</pattern>
-                            <shadedPattern>dev.anchorlight.blueprint.libs.slf4j</shadedPattern>
                         </relocation>
                     </relocations>
                 </configuration>

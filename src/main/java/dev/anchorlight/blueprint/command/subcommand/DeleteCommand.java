@@ -91,6 +91,10 @@ public class DeleteCommand implements SubCommand {
 
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (args.length == 1) {
+            try { return worldService.worldNames(); }
+            catch (StorageException e) { return List.of(); }
+        }
         if (args.length == 2) return List.of("confirm");
         return List.of();
     }

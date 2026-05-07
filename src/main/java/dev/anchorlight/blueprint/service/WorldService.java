@@ -17,7 +17,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -325,5 +327,19 @@ public class WorldService {
 
     public List<WorldMetadata> listWorlds(int page) throws StorageException {
         return storage.listWorlds(page, config.getPageSize());
+    }
+
+    /**
+     * Returns the logical names of all managed worlds, optionally filtered by status.
+     * Pass no arguments to get every world regardless of status.
+     * Results are sorted alphabetically.
+     */
+    public List<String> worldNames(WorldStatus... statuses) throws StorageException {
+        Set<WorldStatus> filter = statuses.length > 0 ? Set.copyOf(Arrays.asList(statuses)) : Set.of();
+        return storage.listAllWorlds().stream()
+                .filter(m -> filter.isEmpty() || filter.contains(m.getStatus()))
+                .map(WorldMetadata::getName)
+                .sorted()
+                .toList();
     }
 }

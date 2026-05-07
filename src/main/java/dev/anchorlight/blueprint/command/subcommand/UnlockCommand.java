@@ -2,6 +2,7 @@ package dev.anchorlight.blueprint.command.subcommand;
 
 import dev.anchorlight.blueprint.config.BlueprintConfig;
 import dev.anchorlight.blueprint.database.StorageException;
+import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.service.WorldService;
 import dev.anchorlight.blueprint.util.Messages;
 import org.bukkit.command.CommandSender;
@@ -52,6 +53,10 @@ public class UnlockCommand implements SubCommand {
 
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (args.length == 1) {
+            try { return worldService.worldNames(WorldStatus.LOCKED); }
+            catch (StorageException e) { return List.of(); }
+        }
         return List.of();
     }
 }

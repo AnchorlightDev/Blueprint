@@ -252,11 +252,17 @@ public class WorldService {
         }
 
         WorldCreator creator = new WorldCreator(meta.getFolderName());
-        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type
+        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type.
+        // Explicit generatorSettings avoids the "No key layers in MapLike[{}]" Paper 1.21 warning.
         File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
         if (!folder.exists()) {
             creator.type(WorldType.FLAT);
             creator.generateStructures(false);
+            creator.generatorSettings(
+                    "{\"layers\":[{\"block\":\"minecraft:bedrock\",\"height\":1}," +
+                    "{\"block\":\"minecraft:dirt\",\"height\":2}," +
+                    "{\"block\":\"minecraft:grass_block\",\"height\":1}]," +
+                    "\"biome\":\"minecraft:plains\"}");
         }
         World world = creator.createWorld();
         if (world != null) {
@@ -283,6 +289,23 @@ public class WorldService {
      */
     public void restoreOpenWorlds() throws StorageException {
         List<WorldMetadata> all = storage.listAllWorlds();
+
+        if (config.isCloseOnRestart()) {
+            int count = 0;
+            for (WorldMetadata meta : all) {
+                if (meta.getStatus() == WorldStatus.OPEN || meta.getStatus() == WorldStatus.LOCKED) {
+                    meta.setStatus(WorldStatus.CLOSED);
+                    meta.markClosed();
+                    storage.saveWorld(meta);
+                    count++;
+                }
+            }
+            if (count > 0) {
+                logger.info("[Blueprint] Marked " + count + " world(s) as CLOSED on restart (close-on-restart=true).");
+            }
+            return;
+        }
+
         int count = 0;
         for (WorldMetadata meta : all) {
             if (meta.getStatus() == WorldStatus.OPEN || meta.getStatus() == WorldStatus.LOCKED) {

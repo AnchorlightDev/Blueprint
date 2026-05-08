@@ -17,6 +17,7 @@ public class BlueprintConfig {
     private final String hubWorld;
     private final boolean autoOpenCreatedWorlds;
     private final boolean autoOpenClones;
+    private final boolean closeOnRestart;
 
     private final boolean snapshotsEnabled;
     private final boolean autoBackupBeforeRestore;
@@ -34,6 +35,7 @@ public class BlueprintConfig {
         hubWorld              = cfg.getString("worlds.hub-world", fallbackWorld);
         autoOpenCreatedWorlds = cfg.getBoolean("worlds.auto-open-created-worlds", true);
         autoOpenClones        = cfg.getBoolean("worlds.auto-open-clones", true);
+        closeOnRestart        = cfg.getBoolean("worlds.close-on-restart", false);
 
         snapshotsEnabled           = cfg.getBoolean("snapshots.enabled", true);
         autoBackupBeforeRestore    = cfg.getBoolean("snapshots.auto-backup-before-restore", true);
@@ -53,6 +55,7 @@ public class BlueprintConfig {
     public String getHubWorld() { return hubWorld; }
     public boolean isAutoOpenCreatedWorlds() { return autoOpenCreatedWorlds; }
     public boolean isAutoOpenClones() { return autoOpenClones; }
+    public boolean isCloseOnRestart() { return closeOnRestart; }
 
     public boolean isSnapshotsEnabled() { return snapshotsEnabled; }
     public boolean isAutoBackupBeforeRestore() { return autoBackupBeforeRestore; }

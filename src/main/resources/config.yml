@@ -18,6 +18,9 @@ worlds:
   auto-open-created-worlds: true
   # Automatically load (open) clone targets after cloning completes
   auto-open-clones: true
+  # If true, worlds that were OPEN or LOCKED before a restart are marked CLOSED on startup
+  # instead of being automatically reloaded. Players must /bp open or /bp tp to re-enter them.
+  close-on-restart: false
 
 snapshots:
   enabled: true

@@ -276,10 +276,16 @@ public class WorldService {
      * <strong>Must be called on the main thread.</strong>
      */
     private void applyBuildWorldRules(@NotNull World world) {
+        // Disable all mob spawning
         world.setSpawnFlags(false, false); // monsters=false, animals=false
         world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
         world.setGameRule(org.bukkit.GameRule.DO_PATROL_SPAWNING, false);
         world.setGameRule(org.bukkit.GameRule.DO_TRADER_SPAWNING, false);
+        world.setGameRule(org.bukkit.GameRule.DO_INSOMNIA, false);       // no phantoms
+        world.setGameRule(org.bukkit.GameRule.DISABLE_RAIDS, true);      // no raids
+        world.setGameRule(org.bukkit.GameRule.DO_WARDEN_SPAWNING, false); // no wardens
+        // Prevent mob griefing (creeper explosions, enderman block picking, etc.)
+        world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
     }
 
     /**

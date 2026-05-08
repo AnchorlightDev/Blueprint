@@ -38,23 +38,23 @@ permissions:
 
   blueprint.command.help:
     description: View Blueprint help
-    default: op
+    default: true
 
   blueprint.command.version:
     description: View Blueprint version info
-    default: op
+    default: true
 
   blueprint.command.create:
     description: Create a new build world
-    default: op
+    default: true
 
   blueprint.command.list:
     description: List managed worlds
-    default: op
+    default: true
 
   blueprint.command.teleport:
     description: Teleport to a build world
-    default: op
+    default: true
 
   blueprint.command.hub:
     description: Return to the hub world
@@ -62,35 +62,35 @@ permissions:
 
   blueprint.command.open:
     description: Open a build world
-    default: op
+    default: true
 
   blueprint.command.close:
     description: Close a build world
-    default: op
+    default: true
 
   blueprint.command.lock:
     description: Lock a build world
-    default: op
+    default: true
 
   blueprint.command.unlock:
     description: Unlock a build world
-    default: op
+    default: true
 
   blueprint.command.clone:
     description: Clone a world
-    default: op
+    default: true
 
   blueprint.command.snapshot:
     description: Manage world snapshots
-    default: op
+    default: true
 
   blueprint.command.rename:
     description: Rename a build world
-    default: op
+    default: true
 
   blueprint.command.delete:
     description: Delete a build world
-    default: op
+    default: true
 
   blueprint.bypass.lock:
     description: Bypass locked-world protections

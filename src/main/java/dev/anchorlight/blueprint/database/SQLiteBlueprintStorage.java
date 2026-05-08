@@ -191,6 +191,39 @@ public class SQLiteBlueprintStorage implements BlueprintStorage {
         }
     }
 
+    @Override
+    public void renameWorld(@NotNull String oldName, @NotNull String newName, @NotNull String newFolderName)
+            throws StorageException {
+        String updateWorld     = "UPDATE blueprint_worlds SET name = ?, folder_name = ?, updated_at = ? WHERE name = ?";
+        String updateSnapshots = "UPDATE blueprint_snapshots SET world_name = ? WHERE world_name = ?";
+
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement psWorld = conn.prepareStatement(updateWorld);
+                 PreparedStatement psSnaps = conn.prepareStatement(updateSnapshots)) {
+
+                psWorld.setString(1, newName);
+                psWorld.setString(2, newFolderName);
+                psWorld.setLong(3, Instant.now().toEpochMilli());
+                psWorld.setString(4, oldName);
+                psWorld.executeUpdate();
+
+                psSnaps.setString(1, newName);
+                psSnaps.setString(2, oldName);
+                psSnaps.executeUpdate();
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new StorageException("Failed to rename world '" + oldName + "' to '" + newName + "'", e);
+        }
+    }
+
     // ── Snapshot operations ───────────────────────────────────────────────
 
     @Override

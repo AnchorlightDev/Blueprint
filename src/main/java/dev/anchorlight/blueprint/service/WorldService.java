@@ -15,12 +15,19 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
 /**
@@ -322,6 +329,93 @@ public class WorldService {
             // We can't block here without deadlock risk; callers in async context should
             // schedule back to the main thread themselves. This is a best-effort convenience.
             plugin.getServer().getScheduler().runTask(plugin, task);
+        }
+    }
+
+    /**
+     * Renames a managed world: evacuates players, renames the world folder on disk,
+     * updates the DB record (and all snapshot references) atomically, then reloads
+     * the world if it was previously open.
+     *
+     * <p>Designed to be called from a background thread; Bukkit operations are
+     * dispatched to the main thread and awaited.</p>
+     *
+     * @param actor UUID of the requesting player for the audit log; null for console
+     * @return the new {@link WorldMetadata} record
+     */
+    public WorldMetadata renameWorld(@NotNull String oldName, @NotNull String newName, @Nullable UUID actor)
+            throws StorageException, IOException {
+        if (!config.isValidWorldName(newName)) {
+            throw new IllegalArgumentException("Invalid world name: " + newName);
+        }
+        WorldMetadata meta = requireWorld(oldName);
+        if (storage.getWorld(newName) != null) {
+            throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
+        }
+
+        String newFolderName = config.getWorldFolderPrefix() + newName;
+        Path worldContainer  = Bukkit.getWorldContainer().toPath();
+        Path oldFolder       = worldContainer.resolve(meta.getFolderName());
+        Path newFolder       = worldContainer.resolve(newFolderName);
+        FileUtil.ensureInsideDirectory(worldContainer, newFolder);
+
+        if (Files.exists(newFolder)) {
+            throw new IllegalArgumentException("Folder '" + newFolderName + "' already exists on disk.");
+        }
+
+        boolean wasLoaded = meta.getStatus() != WorldStatus.CLOSED;
+
+        // ── 1. Unload on the main thread (evacuates players) ──────────────
+        if (wasLoaded) {
+            runOnMainThreadAndWait(() -> unloadBukkitWorld(meta));
+        }
+
+        // ── 2. Rename folder on disk ───────────────────────────────────────
+        try {
+            Files.move(oldFolder, newFolder, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(oldFolder, newFolder);
+        }
+
+        // ── 3. Rename in DB (snapshots updated in the same transaction) ────
+        storage.renameWorld(oldName, newName, newFolderName);
+        storage.logAudit(AuditAction.RENAME_WORLD, newName, actor, "renamed-from=" + oldName);
+
+        // ── 4. Reload on main thread if it was loaded ──────────────────────
+        WorldMetadata newMeta = requireWorld(newName);
+        if (wasLoaded) {
+            if (Bukkit.isPrimaryThread()) {
+                loadBukkitWorld(newMeta);
+            } else {
+                plugin.getServer().getScheduler().runTask(plugin, () -> loadBukkitWorld(newMeta));
+            }
+        }
+
+        logger.info("[Blueprint] Renamed world '" + oldName + "' -> '" + newName + "'");
+        return newMeta;
+    }
+
+    /**
+     * Runs {@code task} on the main thread and blocks the calling thread until it completes.
+     * If already on the main thread, runs immediately.
+     */
+    private void runOnMainThreadAndWait(@NotNull Runnable task) throws IOException {
+        if (Bukkit.isPrimaryThread()) {
+            task.run();
+            return;
+        }
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            task.run();
+            done.complete(null);
+        });
+        try {
+            done.get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for main-thread task");
+        } catch (ExecutionException | TimeoutException e) {
+            throw new IOException("Main-thread task did not complete in time: " + e.getMessage());
         }
     }
 

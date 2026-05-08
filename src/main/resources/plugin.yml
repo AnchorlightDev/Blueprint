@@ -32,6 +32,7 @@ permissions:
       blueprint.command.unlock: true
       blueprint.command.clone: true
       blueprint.command.snapshot: true
+      blueprint.command.rename: true
       blueprint.command.delete: true
       blueprint.bypass.lock: true
 
@@ -81,6 +82,10 @@ permissions:
 
   blueprint.command.snapshot:
     description: Manage world snapshots
+    default: op
+
+  blueprint.command.rename:
+    description: Rename a build world
     default: op
 
   blueprint.command.delete:

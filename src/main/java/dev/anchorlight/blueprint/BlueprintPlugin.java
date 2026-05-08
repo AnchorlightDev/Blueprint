@@ -100,6 +100,7 @@ public class BlueprintPlugin extends JavaPlugin {
         dispatcher.register(new UnlockCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new CloneCommand(cloneService, worldService, blueprintConfig, getLogger()));
         dispatcher.register(new SnapshotCommand(snapshotService, worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new RenameCommand(worldService, opLocks, blueprintConfig, getLogger()));
         dispatcher.register(new DeleteCommand(worldService, opLocks, blueprintConfig, getLogger()));
 
         PluginCommand cmd = getCommand("blueprint");

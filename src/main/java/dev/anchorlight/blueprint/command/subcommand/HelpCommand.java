@@ -27,7 +27,7 @@ public class HelpCommand implements SubCommand {
     @Override
     public void execute(@NotNull CommandSender sender, @NotNull String[] args) {
         sender.sendMessage(MiniMessage.miniMessage().deserialize(
-                "<newline>" + config.getMessagePrefix() + "<aqua>Available commands:</newline>"));
+                "<newline>" + config.getMessagePrefix() + "<aqua>Available commands:"));
 
         for (SubCommand cmd : dispatcher.getSubCommands()) {
             if (!cmd.getPermission().isEmpty() && !sender.hasPermission(cmd.getPermission())) continue;

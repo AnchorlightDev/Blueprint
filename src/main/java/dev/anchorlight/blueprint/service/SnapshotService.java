@@ -117,7 +117,7 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<SnapshotMetadata> future) throws IOException, StorageException {
 
-        Path worldPath   = Bukkit.getWorldContainer().toPath().resolve(meta.getFolderName());
+        Path worldPath   = Bukkit.getWorldContainer().toPath().toAbsolutePath().resolve(meta.getFolderName());
         Path snapDir     = snapshotRoot.resolve(meta.getName()).resolve(snapshotId);
 
         FileUtil.ensureInsideDirectory(Bukkit.getWorldContainer().toPath(), worldPath);

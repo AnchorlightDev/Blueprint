@@ -14,14 +14,14 @@ import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
 
-public class DeleteCommand implements SubCommand {
+public class RenameCommand implements SubCommand {
 
     private final WorldService worldService;
     private final OperationLockService opLocks;
     private final BlueprintConfig config;
     private final Logger logger;
 
-    public DeleteCommand(
+    public RenameCommand(
             @NotNull WorldService worldService,
             @NotNull OperationLockService opLocks,
             @NotNull BlueprintConfig config,
@@ -32,10 +32,10 @@ public class DeleteCommand implements SubCommand {
         this.logger       = logger;
     }
 
-    @Override public @NotNull String getName() { return "delete"; }
-    @Override public @NotNull String getUsage() { return "delete <world> confirm"; }
-    @Override public @NotNull String getDescription() { return "Permanently delete a world"; }
-    @Override public @NotNull String getPermission() { return "blueprint.command.delete"; }
+    @Override public @NotNull String getName() { return "rename"; }
+    @Override public @NotNull String getUsage() { return "rename <world> <new-name>"; }
+    @Override public @NotNull String getDescription() { return "Rename a world to a new name"; }
+    @Override public @NotNull String getPermission() { return "blueprint.command.rename"; }
 
     @Override
     public void execute(@NotNull CommandSender sender, @NotNull String[] args) {
@@ -43,50 +43,45 @@ public class DeleteCommand implements SubCommand {
             Messages.send(sender, config, Messages.ERROR_NO_PERMISSION);
             return;
         }
-        if (args.length < 1) {
+        if (args.length < 2) {
             Messages.send(sender, config, "<red>Usage: <yellow>/blueprint " + getUsage());
             return;
         }
 
-        String worldName = args[0].toLowerCase();
+        String oldName = args[0].toLowerCase();
+        String newName = args[1].toLowerCase();
 
-        // Confirmation check
-        if (config.isRequireDeleteConfirmation()) {
-            if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
-                Messages.send(sender, config,
-                        "<red>This will <bold>permanently delete</bold> world <yellow>'" + worldName + "'<red>!");
-                Messages.send(sender, config,
-                        "<red>Run <yellow>/blueprint delete " + worldName + " confirm<red> to confirm.");
-                return;
-            }
+        if (oldName.equals(newName)) {
+            Messages.send(sender, config, "<red>New name must be different from the current name.");
+            return;
         }
 
-        if (!opLocks.tryLock(worldName)) {
-            Messages.send(sender, config, String.format(Messages.ERROR_BUSY, worldName));
+        if (!opLocks.tryLock(oldName)) {
+            Messages.send(sender, config, String.format(Messages.ERROR_BUSY, oldName));
             return;
         }
 
         UUID actor = sender instanceof Player p ? p.getUniqueId() : null;
-        Messages.send(sender, config, "<gray>Deleting world <yellow>'" + worldName + "'<gray>...");
+        Messages.send(sender, config,
+                "<gray>Renaming <yellow>'" + oldName + "'<gray> to <yellow>'" + newName + "'<gray>...");
 
-        // Run IO on a background thread
-        // World unload is handled inside WorldService.deleteWorld() via main-thread scheduling
         new Thread(() -> {
             try {
-                worldService.deleteWorld(worldName, actor);
-                Messages.send(sender, config, "<green>World <yellow>'" + worldName + "'<green> deleted.");
+                worldService.renameWorld(oldName, newName, actor);
+                Messages.send(sender, config,
+                        "<green>World <yellow>'" + oldName + "'<green> renamed to <yellow>'" + newName + "'<green>.");
             } catch (IllegalArgumentException | IllegalStateException e) {
                 Messages.send(sender, config, "<red>" + e.getMessage());
             } catch (StorageException e) {
-                logger.severe("[Blueprint] DB error deleting world: " + e.getMessage());
+                logger.severe("[Blueprint] DB error renaming world: " + e.getMessage());
                 Messages.send(sender, config, Messages.ERROR_DB_FAILURE);
             } catch (IOException e) {
-                logger.severe("[Blueprint] IO error deleting world: " + e.getMessage());
+                logger.severe("[Blueprint] IO error renaming world: " + e.getMessage());
                 Messages.send(sender, config, Messages.ERROR_IO_FAILURE);
             } finally {
-                opLocks.unlock(worldName);
+                opLocks.unlock(oldName);
             }
-        }, "Blueprint-Delete-" + worldName).start();
+        }, "Blueprint-Rename-" + oldName).start();
     }
 
     @Override
@@ -95,7 +90,6 @@ public class DeleteCommand implements SubCommand {
             try { return worldService.worldNames(); }
             catch (StorageException e) { return List.of(); }
         }
-        if (args.length == 2) return List.of("confirm");
         return List.of();
     }
 }

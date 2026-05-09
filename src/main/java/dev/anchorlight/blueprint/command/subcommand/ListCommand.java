@@ -58,15 +58,15 @@ public class ListCommand implements SubCommand {
 
             sender.sendMessage(MM.deserialize(config.getMessagePrefix() + "<aqua>Worlds (page " + page + "):"));
             for (WorldMetadata meta : worlds) {
-                String statusColor = switch (meta.getStatus()) {
-                    case OPEN     -> "<green>";
-                    case CLOSED   -> "<gray>";
-                    case LOCKED   -> "<red>";
-                    case ARCHIVED -> "<dark_gray>";
+                String statusTag = switch (meta.getStatus()) {
+                    case OPEN     -> "<green>OPEN";
+                    case CLOSED   -> "<gray>CLOSED";
+                    case LOCKED   -> "<green>OPEN <red>[LOCKED]";
+                    case ARCHIVED -> "<dark_gray>ARCHIVED";
                 };
                 sender.sendMessage(MM.deserialize(
                         "  <yellow>" + meta.getName()
-                        + " <dark_gray>| " + statusColor + meta.getStatus().name()
+                        + " <dark_gray>| " + statusTag
                         + " <dark_gray>| <white>" + meta.getFolderName()));
             }
         } catch (StorageException e) {

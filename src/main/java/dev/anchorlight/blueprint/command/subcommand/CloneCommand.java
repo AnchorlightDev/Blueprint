@@ -1,7 +1,9 @@
 package dev.anchorlight.blueprint.command.subcommand;
 
 import dev.anchorlight.blueprint.config.BlueprintConfig;
+import dev.anchorlight.blueprint.database.StorageException;
 import dev.anchorlight.blueprint.service.CloneService;
+import dev.anchorlight.blueprint.service.WorldService;
 import dev.anchorlight.blueprint.util.Messages;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -14,11 +16,14 @@ import java.util.logging.Logger;
 public class CloneCommand implements SubCommand {
 
     private final CloneService cloneService;
+    private final WorldService worldService;
     private final BlueprintConfig config;
     private final Logger logger;
 
-    public CloneCommand(@NotNull CloneService cloneService, @NotNull BlueprintConfig config, @NotNull Logger logger) {
+    public CloneCommand(@NotNull CloneService cloneService, @NotNull WorldService worldService,
+                        @NotNull BlueprintConfig config, @NotNull Logger logger) {
         this.cloneService = cloneService;
+        this.worldService = worldService;
         this.config       = config;
         this.logger       = logger;
     }
@@ -62,6 +67,10 @@ public class CloneCommand implements SubCommand {
 
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (args.length == 1) {
+            try { return worldService.worldNames(); }
+            catch (StorageException e) { return List.of(); }
+        }
         return List.of();
     }
 }

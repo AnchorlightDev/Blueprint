@@ -4,6 +4,7 @@ import dev.anchorlight.blueprint.config.BlueprintConfig;
 import dev.anchorlight.blueprint.database.StorageException;
 import dev.anchorlight.blueprint.model.SnapshotMetadata;
 import dev.anchorlight.blueprint.service.SnapshotService;
+import dev.anchorlight.blueprint.service.WorldService;
 import dev.anchorlight.blueprint.util.Messages;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.command.CommandSender;
@@ -27,11 +28,14 @@ public class SnapshotCommand implements SubCommand {
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private final SnapshotService snapshotService;
+    private final WorldService worldService;
     private final BlueprintConfig config;
     private final Logger logger;
 
-    public SnapshotCommand(@NotNull SnapshotService snapshotService, @NotNull BlueprintConfig config, @NotNull Logger logger) {
+    public SnapshotCommand(@NotNull SnapshotService snapshotService, @NotNull WorldService worldService,
+                           @NotNull BlueprintConfig config, @NotNull Logger logger) {
         this.snapshotService = snapshotService;
+        this.worldService    = worldService;
         this.config          = config;
         this.logger          = logger;
     }
@@ -147,6 +151,10 @@ public class SnapshotCommand implements SubCommand {
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String[] args) {
         if (args.length == 1) return List.of("create", "list", "restore", "delete");
+        if (args.length == 2) {
+            try { return worldService.worldNames(); }
+            catch (StorageException e) { return List.of(); }
+        }
         return List.of();
     }
 }

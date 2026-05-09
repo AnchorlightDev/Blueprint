@@ -34,6 +34,13 @@ public interface BlueprintStorage {
 
     void deleteWorld(@NotNull String name) throws StorageException;
 
+    /**
+     * Atomically renames a world record and updates all snapshot references to the new name.
+     * Executes in a single SQLite transaction.
+     */
+    void renameWorld(@NotNull String oldName, @NotNull String newName, @NotNull String newFolderName)
+            throws StorageException;
+
     // ── Snapshot operations ───────────────────────────────────────────────
 
     void saveSnapshot(@NotNull SnapshotMetadata meta) throws StorageException;

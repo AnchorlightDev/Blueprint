@@ -138,10 +138,10 @@ public class CloneService {
             boolean sourceWasOpen,
             @NotNull CompletableFuture<WorldMetadata> future) throws IOException, StorageException {
 
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath();
-        Path sourceDir      = worldContainer.resolve(sourceMeta.getFolderName());
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path sourceDir      = worldContainer.resolve(sourceMeta.getFolderName()).normalize();
         String targetFolder = config.getWorldFolderPrefix() + targetName;
-        Path targetDir      = worldContainer.resolve(targetFolder);
+        Path targetDir      = worldContainer.resolve(targetFolder).normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, sourceDir);
         FileUtil.ensureInsideDirectory(worldContainer, targetDir);

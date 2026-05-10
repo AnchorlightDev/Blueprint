@@ -1,6 +1,6 @@
 # Blueprint
 
-Blueprint is a modern build-server world management plugin for [Paper](https://papermc.io/), inspired by Scaffold but rewritten from scratch for Paper 1.21+.
+Blueprint is a modern build-server world management plugin for [Paper](https://papermc.io/), rewritten from scratch for Paper 1.21+.
 
 It provides clean, admin-friendly commands for the full lifecycle of build worlds: creation, cloning, snapshots, rollback, locking, and safe deletion — all with async file I/O and SQLite persistence.
 

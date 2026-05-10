@@ -2,11 +2,14 @@
 # https://github.com/anchorlightdev/blueprint
 
 storage:
-  # Currently only "sqlite" is supported
-  type: sqlite
+  # Supported types: "yaml"
+  type: yaml
 
 worlds:
+  # Directory where managed worlds are stored (relative to server root)
+  container-directory: "blueprint"
   # Prefix applied to Bukkit world folder names (e.g. blueprint_myworld)
+  # This is legacy and mostly ignored now that container-directory is used
   folder-prefix: "blueprint_"
   # Number of worlds shown per /blueprint list page
   page-size: 10

@@ -109,7 +109,7 @@ public class YamlBlueprintStorage implements BlueprintStorage {
         List<WorldMetadata> worlds = new ArrayList<>();
         for (File folder : folders) {
             // folderName here should be "container/world"
-            String folderName = containerDirName + File.separator + folder.getName();
+            String folderName = containerDirName + "/" + folder.getName();
             WorldMetadata meta = getWorldByFolder(folderName);
             if (meta != null) {
                 worlds.add(meta);

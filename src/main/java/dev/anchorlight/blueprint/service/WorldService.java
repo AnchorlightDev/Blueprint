@@ -72,7 +72,7 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getContainerDirectory() + File.separator + name;
+        String folderName = config.getContainerDirectory() + "/" + name;
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -402,7 +402,7 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getContainerDirectory() + File.separator + newName;
+        String newFolderName = config.getContainerDirectory() + "/" + newName;
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path containerPath   = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
         Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();

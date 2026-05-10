@@ -27,7 +27,10 @@ public final class FileUtil {
         Path normTarget = target.toAbsolutePath().normalize();
 
         if (!Files.isDirectory(normSource)) {
-            throw new IllegalArgumentException("Source is not a directory: " + normSource);
+            String details = !Files.exists(normSource) ? " (does not exist)" :
+                             !Files.isReadable(normSource) ? " (not readable)" :
+                             Files.isRegularFile(normSource) ? " (is a regular file)" : " (not a directory)";
+            throw new IllegalArgumentException("Source is not a directory: " + normSource + details);
         }
         if (Files.exists(normTarget)) {
             throw new IllegalArgumentException("Target already exists: " + normTarget);

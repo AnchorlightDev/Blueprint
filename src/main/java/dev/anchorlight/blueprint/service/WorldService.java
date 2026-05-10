@@ -221,7 +221,7 @@ public class WorldService {
         }
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = worldContainer.resolve(meta.getFolderName()).normalize();
+        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
         FileUtil.deleteDirectory(worldPath);
 
@@ -385,8 +385,8 @@ public class WorldService {
 
         String newFolderName = config.getWorldFolderPrefix() + newName;
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path oldFolder       = worldContainer.resolve(meta.getFolderName()).normalize();
-        Path newFolder       = worldContainer.resolve(newFolderName).normalize();
+        Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, newFolder);
 
         if (Files.exists(newFolder)) {

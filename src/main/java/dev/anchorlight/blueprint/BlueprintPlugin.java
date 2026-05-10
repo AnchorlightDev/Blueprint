@@ -4,8 +4,8 @@ import dev.anchorlight.blueprint.command.BlueprintCommand;
 import dev.anchorlight.blueprint.command.subcommand.*;
 import dev.anchorlight.blueprint.config.BlueprintConfig;
 import dev.anchorlight.blueprint.database.BlueprintStorage;
-import dev.anchorlight.blueprint.database.SQLiteBlueprintStorage;
 import dev.anchorlight.blueprint.database.StorageException;
+import dev.anchorlight.blueprint.database.YamlBlueprintStorage;
 import dev.anchorlight.blueprint.listener.PortalListener;
 import dev.anchorlight.blueprint.listener.ProtectionListener;
 import dev.anchorlight.blueprint.listener.SessionListener;
@@ -65,12 +65,14 @@ public class BlueprintPlugin extends JavaPlugin {
         }
 
         // ── 3. Storage ────────────────────────────────────────────────────
-        File dbFile = new File(getDataFolder(), "blueprint.db");
-        storage = new SQLiteBlueprintStorage(dbFile, getLogger());
+        File containerDir = new File(blueprintConfig.getContainerDirectory());
+
+        storage = new YamlBlueprintStorage(containerDir, snapshotDir, getLogger());
+
         try {
             storage.initializeSchema();
         } catch (StorageException e) {
-            getLogger().severe("Failed to initialize database: " + e.getMessage());
+            getLogger().severe("Failed to initialize storage: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
         }

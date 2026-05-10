@@ -78,7 +78,7 @@ public class WorldService {
                 : container + "/" + name;
 
         // Ensure no folder collision
-        File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
+        File worldFolder = new File(folderName);
         if (worldFolder.exists()) {
             throw new IllegalArgumentException("World folder already exists on disk: " + folderName);
         }
@@ -224,9 +224,7 @@ public class WorldService {
             ensureMainThread(() -> unloadBukkitWorld(meta));
         }
 
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
-        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
+        Path worldPath = new File(meta.getFolderName()).toPath().toAbsolutePath().normalize();
         FileUtil.deleteDirectory(worldPath);
 
         storage.deleteWorld(name);
@@ -257,7 +255,7 @@ public class WorldService {
         }
 
         // Scaffold-style: delete uid.dat before loading to ensure a fresh UUID
-        File worldFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
+        File worldFolder = new File(meta.getFolderName());
         try {
             FileUtil.deleteIfExists(worldFolder.toPath().resolve("uid.dat"));
         } catch (IOException e) {
@@ -402,10 +400,8 @@ public class WorldService {
         String newFolderName = (container == null || container.isEmpty())
                 ? config.getWorldFolderPrefix() + newName
                 : container + "/" + newName;
-        Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
-        Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();
-        FileUtil.ensureInsideDirectory(worldContainer, newFolder);
+        Path oldFolder       = new File(meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path newFolder       = new File(newFolderName).toPath().toAbsolutePath().normalize();
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("Folder '" + newFolderName + "' already exists on disk.");

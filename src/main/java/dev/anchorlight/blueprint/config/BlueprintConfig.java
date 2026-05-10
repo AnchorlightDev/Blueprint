@@ -30,7 +30,7 @@ public class BlueprintConfig {
     private final String messagePrefix;
 
     public BlueprintConfig(@NotNull FileConfiguration cfg) {
-        containerDirectory    = cfg.getString("worlds.container-directory", "blueprint");
+        containerDirectory    = cfg.getString("worlds.container-directory", "scaffold");
         worldFolderPrefix     = cfg.getString("worlds.folder-prefix", "blueprint_");
         pageSize              = cfg.getInt("worlds.page-size", 10);
         fallbackWorld         = cfg.getString("worlds.fallback-world", "world");

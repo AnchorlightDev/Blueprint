@@ -138,16 +138,18 @@ public class CloneService {
             boolean sourceWasOpen,
             @NotNull CompletableFuture<WorldMetadata> future) throws IOException, StorageException {
 
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path sourceDir      = new File(Bukkit.getWorldContainer(), sourceMeta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path sourceDir      = new File(sourceMeta.getFolderName()).toPath().toAbsolutePath().normalize();
         String container    = config.getContainerDirectory();
         String targetFolder = (container == null || container.isEmpty())
                 ? config.getWorldFolderPrefix() + targetName
                 : container + "/" + targetName;
-        Path targetDir      = new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
+        Path targetDir      = new File(targetFolder).toPath().toAbsolutePath().normalize();
 
-        FileUtil.ensureInsideDirectory(worldContainer, sourceDir);
-        FileUtil.ensureInsideDirectory(worldContainer, targetDir);
+        File root = new File(".").getAbsoluteFile().getParentFile();
+        if (root != null) {
+            FileUtil.ensureInsideDirectory(root.toPath(), sourceDir);
+            FileUtil.ensureInsideDirectory(root.toPath(), targetDir);
+        }
 
         logger.info("[Blueprint] Cloning '" + sourceMeta.getName() + "' -> '" + targetName + "'...");
 

@@ -117,11 +117,13 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<SnapshotMetadata> future) throws IOException, StorageException {
 
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path worldPath      = new File(meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snapshotId).normalize();
 
-        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
+        File root = new File(".").getAbsoluteFile().getParentFile();
+        if (root != null) {
+            FileUtil.ensureInsideDirectory(root.toPath(), worldPath);
+        }
         FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
 
         logger.info("[Blueprint] Creating snapshot '" + snapshotId + "' for world '" + meta.getName() + "'...");
@@ -220,11 +222,13 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<Void> future) throws IOException, StorageException {
 
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path worldPath      = new File(meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snap.getSnapshotId()).normalize();
 
-        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
+        File root = new File(".").getAbsoluteFile().getParentFile();
+        if (root != null) {
+            FileUtil.ensureInsideDirectory(root.toPath(), worldPath);
+        }
         FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
 
         // Auto-backup before restoring

@@ -49,6 +49,11 @@ public class CreateCommand implements SubCommand {
         try {
             WorldMetadata meta = worldService.createWorld(worldName, ownerUuid);
             Messages.send(sender, config, "<green>World <yellow>'" + meta.getName() + "'<green> created successfully!");
+
+            // Auto TP if it's a player
+            if (sender instanceof Player p) {
+                worldService.teleport(p, meta.getName());
+            }
         } catch (IllegalArgumentException e) {
             Messages.send(sender, config, "<red>" + e.getMessage());
         } catch (StorageException e) {

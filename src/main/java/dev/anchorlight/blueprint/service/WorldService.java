@@ -8,6 +8,7 @@ import dev.anchorlight.blueprint.model.AuditAction;
 import dev.anchorlight.blueprint.model.WorldMetadata;
 import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.util.FileUtil;
+import dev.anchorlight.blueprint.util.VoidGenerator;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -144,7 +145,7 @@ public class WorldService {
         WorldMetadata meta = requireWorld(name);
 
         if (meta.getStatus() == WorldStatus.CLOSED) {
-            throw new IllegalStateException("World '" + name + "' is closed.");
+            throw new IllegalStateException("World '" + name + "' is closed and must be opened before teleporting.");
         }
 
         World world = Bukkit.getWorld(meta.getFolderName());
@@ -254,22 +255,38 @@ public class WorldService {
             return;
         }
 
-        WorldCreator creator = new WorldCreator(meta.getFolderName());
-        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type.
-        // Explicit generatorSettings avoids the "No key layers in MapLike[{}]" Paper 1.21 warning.
         File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        if (!folder.exists()) {
-            creator.type(WorldType.FLAT);
-            creator.generateStructures(false);
-            creator.generatorSettings(
-                    "{\"layers\":[{\"block\":\"minecraft:bedrock\",\"height\":1}," +
-                    "{\"block\":\"minecraft:dirt\",\"height\":2}," +
-                    "{\"block\":\"minecraft:grass_block\",\"height\":1}]," +
-                    "\"biome\":\"minecraft:plains\"}");
+        boolean isNew = !folder.exists() || !new File(folder, "level.dat").exists();
+
+        // Delete uid.dat to avoid UUID conflicts
+        if (folder.exists()) {
+            try {
+                FileUtil.deleteIfExists(new File(folder, "uid.dat").toPath());
+            } catch (IOException ignored) {}
         }
+
+        WorldCreator creator = new WorldCreator(meta.getFolderName());
+        if (isNew) {
+            creator.generator(new VoidGenerator());
+            creator.generateStructures(false);
+        }
+
         World world = creator.createWorld();
         if (world != null) {
             applyBuildWorldRules(world);
+            if (isNew) {
+                world.setSpawnLocation(0, 65, 0);
+                generateSpawnPlatform(world);
+                world.save();
+            }
+        }
+    }
+
+    private void generateSpawnPlatform(@NotNull World world) {
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
+                world.getBlockAt(x, 64, z).setType(Material.GLASS);
+            }
         }
     }
 

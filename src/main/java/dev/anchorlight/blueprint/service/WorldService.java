@@ -82,6 +82,12 @@ public class WorldService {
 
         Instant now = Instant.now();
         WorldMetadata meta = new WorldMetadata(name, folderName, owner, WorldStatus.CLOSED, now, now, null, null);
+
+        if (config.isAutoOpenCreatedWorlds()) {
+            meta.setStatus(WorldStatus.OPEN);
+            meta.markOpened();
+        }
+
         storage.saveWorld(meta);
         storage.logAudit(AuditAction.CREATE_WORLD, name, owner, "folder=" + folderName);
 

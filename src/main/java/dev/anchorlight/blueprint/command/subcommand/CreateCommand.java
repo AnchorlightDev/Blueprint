@@ -54,7 +54,7 @@ public class CreateCommand implements SubCommand {
             if (sender instanceof Player p) {
                 worldService.teleport(p, meta.getName());
             }
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             Messages.send(sender, config, "<red>" + e.getMessage());
         } catch (StorageException e) {
             logger.severe("[Blueprint] Database error during world creation: " + e.getMessage());

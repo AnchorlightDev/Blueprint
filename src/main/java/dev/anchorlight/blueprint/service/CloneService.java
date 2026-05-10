@@ -140,7 +140,10 @@ public class CloneService {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path sourceDir      = new File(Bukkit.getWorldContainer(), sourceMeta.getFolderName()).toPath().toAbsolutePath().normalize();
-        String targetFolder = config.getWorldFolderPrefix() + targetName;
+        String container    = config.getContainerDirectory();
+        String targetFolder = (container == null || container.isEmpty())
+                ? config.getWorldFolderPrefix() + targetName
+                : container + "/" + targetName;
         Path targetDir      = new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, sourceDir);

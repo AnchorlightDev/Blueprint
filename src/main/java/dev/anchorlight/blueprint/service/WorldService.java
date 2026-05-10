@@ -8,6 +8,7 @@ import dev.anchorlight.blueprint.model.AuditAction;
 import dev.anchorlight.blueprint.model.WorldMetadata;
 import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.util.FileUtil;
+import dev.anchorlight.blueprint.util.VoidGenerator;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -71,7 +72,10 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getWorldFolderPrefix() + name;
+        String container = config.getContainerDirectory();
+        String folderName = (container == null || container.isEmpty())
+                ? config.getWorldFolderPrefix() + name
+                : container + "/" + name;
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -252,21 +256,32 @@ public class WorldService {
             return;
         }
 
-        WorldCreator creator = new WorldCreator(meta.getFolderName());
-        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type.
-        // Explicit generatorSettings avoids the "No key layers in MapLike[{}]" Paper 1.21 warning.
-        File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        if (!folder.exists()) {
-            creator.type(WorldType.FLAT);
-            creator.generateStructures(false);
-            creator.generatorSettings(
-                    "{\"layers\":[{\"block\":\"minecraft:bedrock\",\"height\":1}," +
-                    "{\"block\":\"minecraft:dirt\",\"height\":2}," +
-                    "{\"block\":\"minecraft:grass_block\",\"height\":1}]," +
-                    "\"biome\":\"minecraft:plains\"}");
+        // Scaffold-style: delete uid.dat before loading to ensure a fresh UUID
+        File worldFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
+        try {
+            FileUtil.deleteIfExists(worldFolder.toPath().resolve("uid.dat"));
+        } catch (IOException e) {
+            logger.warning("[Blueprint] Could not delete uid.dat for world '" + meta.getName() + "': " + e.getMessage());
         }
+
+        WorldCreator creator = new WorldCreator(meta.getFolderName());
+        boolean isNew = !worldFolder.exists();
+        if (isNew) {
+            creator.generator(new VoidGenerator());
+            creator.generateStructures(false);
+        }
+
         World world = creator.createWorld();
         if (world != null) {
+            if (isNew) {
+                // Scaffold-style: generate a 3x3 glass platform at y=64
+                world.setSpawnLocation(0, 65, 0);
+                for (int x = -1; x <= 1; x++) {
+                    for (int z = -1; z <= 1; z++) {
+                        world.getBlockAt(x, 64, z).setType(Material.GLASS);
+                    }
+                }
+            }
             applyBuildWorldRules(world);
         }
     }
@@ -383,7 +398,10 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getWorldFolderPrefix() + newName;
+        String container = config.getContainerDirectory();
+        String newFolderName = (container == null || container.isEmpty())
+                ? config.getWorldFolderPrefix() + newName
+                : container + "/" + newName;
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();

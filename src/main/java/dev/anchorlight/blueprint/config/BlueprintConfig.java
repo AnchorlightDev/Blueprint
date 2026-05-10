@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
  */
 public class BlueprintConfig {
 
+    private final String containerDirectory;
     private final String worldFolderPrefix;
     private final int pageSize;
     private final String fallbackWorld;
@@ -29,6 +30,7 @@ public class BlueprintConfig {
     private final String messagePrefix;
 
     public BlueprintConfig(@NotNull FileConfiguration cfg) {
+        containerDirectory    = cfg.getString("worlds.container-directory", "scaffold");
         worldFolderPrefix     = cfg.getString("worlds.folder-prefix", "blueprint_");
         pageSize              = cfg.getInt("worlds.page-size", 10);
         fallbackWorld         = cfg.getString("worlds.fallback-world", "world");
@@ -49,6 +51,7 @@ public class BlueprintConfig {
                 "<gradient:#00aaff:#0066ff><bold>Blueprint</bold></gradient> <dark_gray>»</dark_gray> ");
     }
 
+    public String getContainerDirectory() { return containerDirectory; }
     public String getWorldFolderPrefix() { return worldFolderPrefix; }
     public int getPageSize() { return pageSize; }
     public String getFallbackWorld() { return fallbackWorld; }

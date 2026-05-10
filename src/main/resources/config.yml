@@ -6,6 +6,10 @@ storage:
   type: sqlite
 
 worlds:
+  # Directory where managed worlds are stored, relative to server root.
+  # If this is set, worlds will be stored in "container/worldname".
+  # Default: "scaffold"
+  container-directory: "scaffold"
   # Prefix applied to Bukkit world folder names (e.g. blueprint_myworld)
   folder-prefix: "blueprint_"
   # Number of worlds shown per /blueprint list page

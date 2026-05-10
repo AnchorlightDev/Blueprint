@@ -95,10 +95,11 @@ public class ProtectionListener implements Listener {
     private boolean isWorldLocked(@NotNull World world) {
         try {
             // Try to match world folder name to a Blueprint world
+            // In modern Paper, world.getName() usually returns the folder name relative to container
             String folderName = world.getName();
-            // We need to search by folder name; do a quick lookup via storage
-            // For efficiency this lookup is intentionally simple; lock checks happen on every event
-            // so we rely on the storage being fast.
+
+            // For worlds in a container, Paper might name them like "blueprint/worldname"
+            // storage.getWorldByFolder(folderName) should handle this if folderName is "container/world"
             WorldMetadata meta = storage.getWorldByFolder(folderName);
             return meta != null && meta.getStatus() == WorldStatus.LOCKED;
         } catch (StorageException e) {

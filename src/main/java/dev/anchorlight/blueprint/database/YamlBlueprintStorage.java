@@ -12,8 +12,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.time.Instant;
-import java.util.logging.Logger;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -25,12 +25,12 @@ public class YamlBlueprintStorage implements BlueprintStorage {
 
     private final File dataFolder;
     private final Logger logger;
-    private final String folderPrefix;
+    private final String containerDirName;
 
-    public YamlBlueprintStorage(@NotNull File dataFolder, @NotNull Logger logger, @NotNull String folderPrefix) {
+    public YamlBlueprintStorage(@NotNull File dataFolder, @NotNull Logger logger, @NotNull String containerDirName) {
         this.dataFolder = dataFolder;
         this.logger = logger;
-        this.folderPrefix = folderPrefix;
+        this.containerDirName = containerDirName;
     }
 
     @Override
@@ -46,7 +46,7 @@ public class YamlBlueprintStorage implements BlueprintStorage {
     @Override
     public void saveWorld(@NotNull WorldMetadata meta) throws StorageException {
         File worldFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        if (!worldFolder.exists()) {
+        if (!worldFolder.exists() && !worldFolder.mkdirs()) {
             return;
         }
 
@@ -100,13 +100,17 @@ public class YamlBlueprintStorage implements BlueprintStorage {
 
     @Override
     public List<WorldMetadata> listAllWorlds() throws StorageException {
-        File container = Bukkit.getWorldContainer();
-        File[] folders = container.listFiles(f -> f.isDirectory() && f.getName().startsWith(folderPrefix));
+        File containerDir = new File(Bukkit.getWorldContainer(), containerDirName);
+        if (!containerDir.exists()) return Collections.emptyList();
+
+        File[] folders = containerDir.listFiles(File::isDirectory);
         if (folders == null) return Collections.emptyList();
 
         List<WorldMetadata> worlds = new ArrayList<>();
         for (File folder : folders) {
-            WorldMetadata meta = getWorldByFolder(folder.getName());
+            // folderName here should be "container/world"
+            String folderName = containerDirName + File.separator + folder.getName();
+            WorldMetadata meta = getWorldByFolder(folderName);
             if (meta != null) {
                 worlds.add(meta);
             }

@@ -71,7 +71,7 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getWorldFolderPrefix() + name;
+        String folderName = config.getContainerDirectory() + File.separator + name;
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -221,8 +221,10 @@ public class WorldService {
         }
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path containerPath  = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
         Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
+        FileUtil.ensureInsideDirectory(containerPath, worldPath);
         FileUtil.deleteDirectory(worldPath);
 
         storage.deleteWorld(name);
@@ -383,11 +385,13 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getWorldFolderPrefix() + newName;
+        String newFolderName = config.getContainerDirectory() + File.separator + newName;
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path containerPath   = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
         Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, newFolder);
+        FileUtil.ensureInsideDirectory(containerPath, newFolder);
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("Folder '" + newFolderName + "' already exists on disk.");

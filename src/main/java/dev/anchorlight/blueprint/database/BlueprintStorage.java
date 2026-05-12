@@ -27,6 +27,8 @@ public interface BlueprintStorage {
 
     @Nullable WorldMetadata getWorld(@NotNull String name) throws StorageException;
 
+    @Nullable WorldMetadata getWorldByFolder(@NotNull String folderName) throws StorageException;
+
     List<WorldMetadata> listWorlds(int page, int pageSize) throws StorageException;
 
     /** Returns every world record with no pagination — used for startup recovery. */

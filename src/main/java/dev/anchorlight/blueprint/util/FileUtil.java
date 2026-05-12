@@ -23,25 +23,31 @@ public final class FileUtil {
      * @throws IOException              on any IO failure
      */
     public static void copyDirectory(@NotNull Path source, @NotNull Path target) throws IOException {
-        if (!Files.isDirectory(source)) {
-            throw new IllegalArgumentException("Source is not a directory: " + source);
+        Path normSource = source.toAbsolutePath().normalize();
+        Path normTarget = target.toAbsolutePath().normalize();
+
+        if (!Files.isDirectory(normSource)) {
+            String details = !Files.exists(normSource) ? " (does not exist)" :
+                             !Files.isReadable(normSource) ? " (not readable)" :
+                             Files.isRegularFile(normSource) ? " (is a regular file)" : " (not a directory)";
+            throw new IllegalArgumentException("Source is not a directory: " + normSource + details);
         }
-        if (Files.exists(target)) {
-            throw new IllegalArgumentException("Target already exists: " + target);
+        if (Files.exists(normTarget)) {
+            throw new IllegalArgumentException("Target already exists: " + normTarget);
         }
 
-        Files.walkFileTree(source, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
+        Files.walkFileTree(normSource, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
                 new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                        Path dest = target.resolve(source.relativize(dir));
+                        Path dest = normTarget.resolve(normSource.relativize(dir));
                         Files.createDirectories(dest);
                         return FileVisitResult.CONTINUE;
                     }
 
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        Path dest = target.resolve(source.relativize(file));
+                        Path dest = normTarget.resolve(normSource.relativize(file));
                         Files.copy(file, dest, StandardCopyOption.COPY_ATTRIBUTES);
                         return FileVisitResult.CONTINUE;
                     }
@@ -55,9 +61,10 @@ public final class FileUtil {
      * @throws IOException on any IO failure
      */
     public static void deleteDirectory(@NotNull Path path) throws IOException {
-        if (!Files.exists(path)) return;
+        Path normPath = path.toAbsolutePath().normalize();
+        if (!Files.exists(normPath)) return;
 
-        Files.walkFileTree(path, new SimpleFileVisitor<>() {
+        Files.walkFileTree(normPath, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Files.delete(file);
@@ -80,9 +87,10 @@ public final class FileUtil {
      * @throws IOException on any IO failure
      */
     public static long directorySize(@NotNull Path path) throws IOException {
-        if (!Files.exists(path)) return 0L;
+        Path normPath = path.toAbsolutePath().normalize();
+        if (!Files.exists(normPath)) return 0L;
         long[] size = {0L};
-        Files.walkFileTree(path, new SimpleFileVisitor<>() {
+        Files.walkFileTree(normPath, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 size[0] += attrs.size();
@@ -101,7 +109,7 @@ public final class FileUtil {
         Path normalBase  = base.toAbsolutePath().normalize();
         Path normalChild = child.toAbsolutePath().normalize();
         if (!normalChild.startsWith(normalBase)) {
-            throw new SecurityException("Path escape detected: " + child + " is not inside " + base);
+            throw new SecurityException("Path escape detected: " + normalChild + " is not inside " + normalBase);
         }
     }
 
@@ -109,6 +117,6 @@ public final class FileUtil {
      * Deletes a single file if it exists; silently ignores missing files.
      */
     public static void deleteIfExists(@NotNull Path path) throws IOException {
-        Files.deleteIfExists(path);
+        Files.deleteIfExists(path.toAbsolutePath().normalize());
     }
 }

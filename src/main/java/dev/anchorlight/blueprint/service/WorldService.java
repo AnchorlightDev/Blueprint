@@ -8,6 +8,7 @@ import dev.anchorlight.blueprint.model.AuditAction;
 import dev.anchorlight.blueprint.model.WorldMetadata;
 import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.util.FileUtil;
+import dev.anchorlight.blueprint.util.VoidGenerator;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -71,7 +72,7 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getWorldFolderPrefix() + name;
+        String folderName = config.getContainerDirectory() + "/" + name;
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -81,6 +82,12 @@ public class WorldService {
 
         Instant now = Instant.now();
         WorldMetadata meta = new WorldMetadata(name, folderName, owner, WorldStatus.CLOSED, now, now, null, null);
+
+        if (config.isAutoOpenCreatedWorlds()) {
+            meta.setStatus(WorldStatus.OPEN);
+            meta.markOpened();
+        }
+
         storage.saveWorld(meta);
         storage.logAudit(AuditAction.CREATE_WORLD, name, owner, "folder=" + folderName);
 
@@ -144,7 +151,7 @@ public class WorldService {
         WorldMetadata meta = requireWorld(name);
 
         if (meta.getStatus() == WorldStatus.CLOSED) {
-            throw new IllegalStateException("World '" + name + "' is closed.");
+            throw new IllegalStateException("World '" + name + "' is closed and must be opened before teleporting.");
         }
 
         World world = Bukkit.getWorld(meta.getFolderName());
@@ -220,8 +227,11 @@ public class WorldService {
             ensureMainThread(() -> unloadBukkitWorld(meta));
         }
 
-        Path worldPath = Bukkit.getWorldContainer().toPath().toAbsolutePath().resolve(meta.getFolderName());
-        FileUtil.ensureInsideDirectory(Bukkit.getWorldContainer().toPath(), worldPath);
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path containerPath  = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
+        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
+        FileUtil.ensureInsideDirectory(containerPath, worldPath);
         FileUtil.deleteDirectory(worldPath);
 
         storage.deleteWorld(name);
@@ -251,22 +261,38 @@ public class WorldService {
             return;
         }
 
-        WorldCreator creator = new WorldCreator(meta.getFolderName());
-        // Use FLAT for brand-new worlds (no existing folder); existing worlds keep their type.
-        // Explicit generatorSettings avoids the "No key layers in MapLike[{}]" Paper 1.21 warning.
         File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        if (!folder.exists()) {
-            creator.type(WorldType.FLAT);
-            creator.generateStructures(false);
-            creator.generatorSettings(
-                    "{\"layers\":[{\"block\":\"minecraft:bedrock\",\"height\":1}," +
-                    "{\"block\":\"minecraft:dirt\",\"height\":2}," +
-                    "{\"block\":\"minecraft:grass_block\",\"height\":1}]," +
-                    "\"biome\":\"minecraft:plains\"}");
+        boolean isNew = !folder.exists() || !new File(folder, "level.dat").exists();
+
+        // Delete uid.dat to avoid UUID conflicts
+        if (folder.exists()) {
+            try {
+                FileUtil.deleteIfExists(new File(folder, "uid.dat").toPath());
+            } catch (IOException ignored) {}
         }
+
+        WorldCreator creator = new WorldCreator(meta.getFolderName());
+        if (isNew) {
+            creator.generator(new VoidGenerator());
+            creator.generateStructures(false);
+        }
+
         World world = creator.createWorld();
         if (world != null) {
             applyBuildWorldRules(world);
+            if (isNew) {
+                world.setSpawnLocation(0, 65, 0);
+                generateSpawnPlatform(world);
+                world.save();
+            }
+        }
+    }
+
+    private void generateSpawnPlatform(@NotNull World world) {
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
+                world.getBlockAt(x, 64, z).setType(Material.GLASS);
+            }
         }
     }
 
@@ -382,11 +408,13 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getWorldFolderPrefix() + newName;
-        Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath();
-        Path oldFolder       = worldContainer.resolve(meta.getFolderName());
-        Path newFolder       = worldContainer.resolve(newFolderName);
+        String newFolderName = config.getContainerDirectory() + "/" + newName;
+        Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path containerPath   = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
+        Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, newFolder);
+        FileUtil.ensureInsideDirectory(containerPath, newFolder);
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("Folder '" + newFolderName + "' already exists on disk.");

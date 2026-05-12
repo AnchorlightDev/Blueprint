@@ -59,7 +59,7 @@ public class TpCommand implements SubCommand {
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String[] args) {
         if (args.length == 1) {
-            try { return worldService.worldNames(WorldStatus.OPEN, WorldStatus.LOCKED); }
+            try { return worldService.worldNames(); } // Show all worlds
             catch (StorageException e) { return List.of(); }
         }
         return List.of();

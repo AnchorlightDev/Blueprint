@@ -55,7 +55,7 @@ public class SnapshotService {
         this.worldService = worldService;
         this.opLocks      = opLocks;
         this.logger       = plugin.getLogger();
-        this.snapshotRoot = plugin.getDataFolder().toPath().resolve("snapshots");
+        this.snapshotRoot = plugin.getDataFolder().toPath().toAbsolutePath().normalize().resolve("snapshots");
     }
 
     /**
@@ -117,10 +117,11 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<SnapshotMetadata> future) throws IOException, StorageException {
 
-        Path worldPath   = Bukkit.getWorldContainer().toPath().toAbsolutePath().resolve(meta.getFolderName());
-        Path snapDir     = snapshotRoot.resolve(meta.getName()).resolve(snapshotId);
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snapshotId).normalize();
 
-        FileUtil.ensureInsideDirectory(Bukkit.getWorldContainer().toPath(), worldPath);
+        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
         FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
 
         logger.info("[Blueprint] Creating snapshot '" + snapshotId + "' for world '" + meta.getName() + "'...");
@@ -219,10 +220,11 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<Void> future) throws IOException, StorageException {
 
-        Path worldPath = Bukkit.getWorldContainer().toPath().resolve(meta.getFolderName());
-        Path snapDir   = snapshotRoot.resolve(meta.getName()).resolve(snap.getSnapshotId());
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snap.getSnapshotId()).normalize();
 
-        FileUtil.ensureInsideDirectory(Bukkit.getWorldContainer().toPath(), worldPath);
+        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
         FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
 
         // Auto-backup before restoring
@@ -289,7 +291,7 @@ public class SnapshotService {
 
             plugin.getIoExecutor().submit(() -> {
                 try {
-                    Path snapDir = snapshotRoot.resolve(worldName).resolve(snapshotId);
+                    Path snapDir = snapshotRoot.resolve(worldName).resolve(snapshotId).normalize();
                     FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
                     FileUtil.deleteDirectory(snapDir);
 
@@ -318,7 +320,7 @@ public class SnapshotService {
         while (snapshots.size() >= max) {
             SnapshotMetadata oldest = snapshots.get(snapshots.size() - 1);
             try {
-                Path dir = snapshotRoot.resolve(worldName).resolve(oldest.getSnapshotId());
+                Path dir = snapshotRoot.resolve(worldName).resolve(oldest.getSnapshotId()).normalize();
                 FileUtil.deleteDirectory(dir);
             } catch (IOException e) {
                 logger.warning("[Blueprint] Failed to prune snapshot folder: " + e.getMessage());

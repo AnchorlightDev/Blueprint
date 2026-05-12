@@ -95,30 +95,17 @@ public class ProtectionListener implements Listener {
     private boolean isWorldLocked(@NotNull World world) {
         try {
             // Try to match world folder name to a Blueprint world
+            // In modern Paper, world.getName() usually returns the folder name relative to container
             String folderName = world.getName();
-            // We need to search by folder name; do a quick lookup via storage
-            // The BlueprintStorage.getWorld() uses the logical name, so we scan by folder
-            // For efficiency this lookup is intentionally simple; lock checks happen on every event
-            // so we cache nothing and rely on the DB connection pool being fast (local SQLite).
-            WorldMetadata meta = getMetaByFolder(folderName);
+
+            // For worlds in a container, Paper might name them like "blueprint/worldname"
+            // storage.getWorldByFolder(folderName) should handle this if folderName is "container/world"
+            WorldMetadata meta = storage.getWorldByFolder(folderName);
             return meta != null && meta.getStatus() == WorldStatus.LOCKED;
         } catch (StorageException e) {
-            logger.warning("[Blueprint] ProtectionListener DB error: " + e.getMessage());
+            logger.warning("[Blueprint] ProtectionListener storage error: " + e.getMessage());
             return false;
         }
-    }
-
-    /**
-     * Finds world metadata whose folder name matches the given Bukkit world name.
-     * Uses a simple full-scan via listWorlds (page 1, large size) because this is
-     * a local SQLite DB and the world count is expected to be small.
-     */
-    private WorldMetadata getMetaByFolder(String folderName) throws StorageException {
-        // Page through all worlds (assuming reasonable total count)
-        for (WorldMetadata m : storage.listWorlds(1, 1000)) {
-            if (m.getFolderName().equals(folderName)) return m;
-        }
-        return null;
     }
 
     private void sendLocked(@NotNull Player player) {

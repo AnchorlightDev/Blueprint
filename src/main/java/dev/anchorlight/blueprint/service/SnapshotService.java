@@ -40,7 +40,6 @@ public class SnapshotService {
     private final BlueprintConfig config;
     private final WorldService worldService;
     private final OperationLockService opLocks;
-    private final Path snapshotRoot;
     private final Logger logger;
 
     public SnapshotService(
@@ -55,7 +54,6 @@ public class SnapshotService {
         this.worldService = worldService;
         this.opLocks      = opLocks;
         this.logger       = plugin.getLogger();
-        this.snapshotRoot = plugin.getDataFolder().toPath().toAbsolutePath().normalize().resolve("snapshots");
     }
 
     /**
@@ -119,16 +117,19 @@ public class SnapshotService {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
-        Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snapshotId).normalize();
+        Path snapshotsDir   = worldPath.resolve("snapshots");
+        Path snapDir        = snapshotsDir.resolve(snapshotId).normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
-        FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
+        FileUtil.ensureInsideDirectory(worldPath, snapDir);
 
+        logger.info("[Blueprint] Snapshot path: " + snapDir);
+        logger.info("[Blueprint] World path: " + worldPath);
         logger.info("[Blueprint] Creating snapshot '" + snapshotId + "' for world '" + meta.getName() + "'...");
-        FileUtil.copyDirectory(worldPath, snapDir);
+        FileUtil.copyDirectory(worldPath, snapDir, List.of("snapshots"));
 
         // Prune oldest snapshots if limit exceeded
-        pruneOldSnapshots(meta.getName());
+        pruneOldSnapshots(meta.getName(), worldPath);
 
         SnapshotMetadata snapMeta = new SnapshotMetadata(snapshotId, meta.getName(), actor, Instant.now(), null);
         storage.saveSnapshot(snapMeta);
@@ -191,7 +192,8 @@ public class SnapshotService {
             // Unload on main thread
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
-                    if (wasOpen) worldService.unloadBukkitWorld(meta);
+                    // Always try to unload to ensure players are evacuated and file locks released
+                    worldService.unloadBukkitWorld(meta);
 
                     plugin.getIoExecutor().submit(() -> {
                         try {
@@ -220,29 +222,37 @@ public class SnapshotService {
             boolean wasOpen,
             @NotNull CompletableFuture<Void> future) throws IOException, StorageException {
 
+        // Log initial info
+        logger.info("[Blueprint] Restoration started for world: " + meta.getName());
+        logger.info("[Blueprint] Snapshot ID: " + snap.getSnapshotId());
+
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
-        Path snapDir        = snapshotRoot.resolve(meta.getName()).resolve(snap.getSnapshotId()).normalize();
+        Path snapshotsDir   = worldPath.resolve("snapshots");
+        Path snapDir        = snapshotsDir.resolve(snap.getSnapshotId()).normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
-        FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
+        FileUtil.ensureInsideDirectory(worldPath, snapDir);
+
+        logger.info("[Blueprint] Snapshot path: " + snapDir);
+        logger.info("[Blueprint] World path: " + worldPath);
 
         // Auto-backup before restoring
         if (config.isAutoBackupBeforeRestore()) {
             String backupId = "pre-restore-" + SNAP_FMT.format(Instant.now());
-            Path backupDir  = snapshotRoot.resolve(meta.getName()).resolve(backupId);
+            Path backupDir  = snapshotsDir.resolve(backupId);
             logger.info("[Blueprint] Auto-backup before restore: " + backupId);
-            FileUtil.copyDirectory(worldPath, backupDir);
+            FileUtil.copyDirectory(worldPath, backupDir, List.of("snapshots"));
 
             SnapshotMetadata backupMeta = new SnapshotMetadata(
                     backupId, meta.getName(), actor, Instant.now(), "auto-backup before restore of " + snap.getSnapshotId());
             storage.saveSnapshot(backupMeta);
         }
 
-        // Replace world folder
+        // Replace world folder contents
         logger.info("[Blueprint] Restoring snapshot '" + snap.getSnapshotId() + "' into '" + meta.getName() + "'...");
-        FileUtil.deleteDirectory(worldPath);
-        FileUtil.copyDirectory(snapDir, worldPath);
+        FileUtil.deleteDirectory(worldPath, List.of("snapshots"));
+        FileUtil.copyDirectory(snapDir, worldPath, List.of("snapshots"));
 
         // Remove world-unique files so Bukkit assigns a fresh UID
         FileUtil.deleteIfExists(worldPath.resolve("uid.dat"));
@@ -254,15 +264,19 @@ public class SnapshotService {
         // Reload world on main thread if it was open
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             try {
+                boolean reloadSuccess = false;
                 if (wasOpen) {
                     worldService.loadBukkitWorld(meta);
                     meta.setStatus(WorldStatus.OPEN);
                     meta.markOpened();
                     storage.saveWorld(meta);
+                    reloadSuccess = true;
                 }
+                logger.info("[Blueprint] Reload result: " + (wasOpen ? (reloadSuccess ? "RELOADED" : "RELOAD_FAILED") : "NOT_RELOADED"));
                 opLocks.unlock(meta.getName());
                 future.complete(null);
             } catch (Exception e) {
+                logger.severe("[Blueprint] Reload result: FAILED (" + e.getMessage() + ")");
                 opLocks.unlock(meta.getName());
                 future.completeExceptionally(e);
             }
@@ -282,7 +296,7 @@ public class SnapshotService {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         try {
-            worldService.requireWorld(worldName);
+            WorldMetadata meta = worldService.requireWorld(worldName);
             SnapshotMetadata snap = storage.getSnapshot(worldName, snapshotId);
             if (snap == null) {
                 future.completeExceptionally(new IllegalArgumentException("Snapshot not found: " + snapshotId));
@@ -291,8 +305,9 @@ public class SnapshotService {
 
             plugin.getIoExecutor().submit(() -> {
                 try {
-                    Path snapDir = snapshotRoot.resolve(worldName).resolve(snapshotId).normalize();
-                    FileUtil.ensureInsideDirectory(plugin.getDataFolder().toPath(), snapDir);
+                    Path worldPath = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+                    Path snapDir   = worldPath.resolve("snapshots").resolve(snapshotId).normalize();
+                    FileUtil.ensureInsideDirectory(worldPath, snapDir);
                     FileUtil.deleteDirectory(snapDir);
 
                     storage.deleteSnapshot(worldName, snapshotId);
@@ -311,7 +326,7 @@ public class SnapshotService {
     }
 
     /** Removes oldest snapshots if the per-world limit is exceeded. */
-    private void pruneOldSnapshots(@NotNull String worldName) throws StorageException {
+    private void pruneOldSnapshots(@NotNull String worldName, @NotNull Path worldPath) throws StorageException {
         int max = config.getMaxSnapshotsPerWorld();
         if (max <= 0) return;
 
@@ -320,7 +335,7 @@ public class SnapshotService {
         while (snapshots.size() >= max) {
             SnapshotMetadata oldest = snapshots.get(snapshots.size() - 1);
             try {
-                Path dir = snapshotRoot.resolve(worldName).resolve(oldest.getSnapshotId()).normalize();
+                Path dir = worldPath.resolve("snapshots").resolve(oldest.getSnapshotId()).normalize();
                 FileUtil.deleteDirectory(dir);
             } catch (IOException e) {
                 logger.warning("[Blueprint] Failed to prune snapshot folder: " + e.getMessage());

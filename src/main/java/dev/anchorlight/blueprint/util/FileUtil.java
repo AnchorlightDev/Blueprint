@@ -75,7 +75,7 @@ public final class FileUtil {
                         }
 
                         Path dest = normTarget.resolve(relative);
-                        Files.copy(file, dest, StandardCopyOption.COPY_ATTRIBUTES);
+                        Files.copy(file, dest, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
                         return FileVisitResult.CONTINUE;
                     }
                 });

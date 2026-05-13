@@ -271,11 +271,11 @@ public class WorldService {
             } catch (IOException ignored) {}
         }
 
-        WorldCreator creator = new WorldCreator(meta.getFolderName());
-        if (isNew) {
-            creator.generator(new VoidGenerator());
-            creator.generateStructures(false);
-        }
+        // Always use VoidGenerator so restored/existing worlds don't sprout vanilla
+        // terrain in unvisited chunks.
+        WorldCreator creator = new WorldCreator(meta.getFolderName())
+                .generator(new VoidGenerator())
+                .generateStructures(false);
 
         World world = creator.createWorld();
         if (world != null) {
@@ -312,6 +312,9 @@ public class WorldService {
         world.setGameRule(org.bukkit.GameRule.DO_WARDEN_SPAWNING, false); // no wardens
         // Prevent mob griefing (creeper explosions, enderman block picking, etc.)
         world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
+        // Lock build worlds to permanent day
+        world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setTime(6000); // noon
     }
 
     /**
@@ -353,6 +356,8 @@ public class WorldService {
     /**
      * Evacuates players and unloads the world.
      * <strong>Must be called on the main thread.</strong>
+     *
+     * @throws IllegalStateException if the world cannot be unloaded
      */
     void unloadBukkitWorld(@NotNull WorldMetadata meta) {
         World world = Bukkit.getWorld(meta.getFolderName());
@@ -368,7 +373,12 @@ public class WorldService {
                     .deserialize("<yellow>You were moved to the fallback world because '" + meta.getName() + "' was unloaded."));
         }
 
-        Bukkit.unloadWorld(world, true); // save=true
+        // Explicitly save all chunks before unloading so file operations see a fully
+        // flushed state — Paper's async save may not complete before unloadWorld returns.
+        world.save();
+        if (!Bukkit.unloadWorld(world, false)) {
+            throw new IllegalStateException("Failed to unload world '" + meta.getName() + "' — cannot proceed with file operations.");
+        }
     }
 
     /**

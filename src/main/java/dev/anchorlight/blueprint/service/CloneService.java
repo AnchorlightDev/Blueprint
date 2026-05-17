@@ -103,6 +103,8 @@ public class CloneService {
             // Close source on main thread before copying
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
+                    // Capture the authoritative source folder BEFORE unloading.
+                    Path sourceActualPath = worldService.resolveWorldPath(sourceMeta);
                     if (sourceWasOpen) {
                         worldService.unloadBukkitWorld(sourceMeta);
                     }
@@ -110,7 +112,7 @@ public class CloneService {
                     // Dispatch file copy to IO executor
                     plugin.getIoExecutor().submit(() -> {
                         try {
-                            performCopy(sourceMeta, targetName, actor, sourceWasOpen, future);
+                            performCopy(sourceMeta, sourceActualPath, targetName, actor, sourceWasOpen, future);
                         } catch (Exception e) {
                             opLocks.unlock(sourceName);
                             opLocks.unlock(targetName);
@@ -133,14 +135,15 @@ public class CloneService {
 
     private void performCopy(
             @NotNull WorldMetadata sourceMeta,
+            @NotNull Path sourceDir,
             @NotNull String targetName,
             @Nullable UUID actor,
             boolean sourceWasOpen,
             @NotNull CompletableFuture<WorldMetadata> future) throws IOException, StorageException {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path sourceDir      = new File(Bukkit.getWorldContainer(), sourceMeta.getFolderName()).toPath().toAbsolutePath().normalize();
-        String targetFolder = config.getWorldFolderPrefix() + targetName;
+        // Use the same folder scheme as WorldService.createWorld: containerDir/name
+        String targetFolder = config.getContainerDirectory() + "/" + targetName;
         Path targetDir      = new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, sourceDir);

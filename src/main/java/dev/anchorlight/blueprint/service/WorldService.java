@@ -254,6 +254,30 @@ public class WorldService {
      * Loads the world into Bukkit and applies build-server defaults (no mobs).
      * <strong>Must be called on the main thread.</strong>
      */
+    /**
+     * Returns the world's actual data folder.  When the world is currently loaded
+     * in Bukkit, {@code world.getWorldFolder()} is the authoritative source —
+     * Paper may store world data at a path that differs from the folder name we
+     * stored at creation time.  Falls back to the computed path when the world is
+     * not loaded (e.g. CLOSED worlds).
+     *
+     * <strong>Must be called on the main thread.</strong>
+     */
+    public @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {
+        World world = Bukkit.getWorld(meta.getFolderName());
+        Path computed = new File(Bukkit.getWorldContainer(), meta.getFolderName())
+                .toPath().toAbsolutePath().normalize();
+        if (world == null) return computed;
+
+        Path actual = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+        if (!actual.equals(computed)) {
+            logger.warning("[Blueprint] World folder mismatch for '" + meta.getName() + "'!"
+                    + " Computed: " + computed + "  Actual (from Bukkit): " + actual
+                    + "  — using actual path for file operations.");
+        }
+        return actual;
+    }
+
     void loadBukkitWorld(@NotNull WorldMetadata meta) {
         World existing = Bukkit.getWorld(meta.getFolderName());
         if (existing != null) {

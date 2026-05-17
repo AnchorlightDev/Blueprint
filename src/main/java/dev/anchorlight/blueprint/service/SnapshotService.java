@@ -89,7 +89,7 @@ public class SnapshotService {
                     // Capture the authoritative folder from Bukkit BEFORE unloading.
                     // world.getWorldFolder() may differ from our computed path in some
                     // Paper configurations.
-                    Path worldPath = resolveWorldPath(meta);
+                    Path worldPath = worldService.resolveWorldPath(meta);
 
                     if (wasOpen) worldService.unloadBukkitWorld(meta);
 
@@ -200,7 +200,7 @@ public class SnapshotService {
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
                     // Capture the authoritative folder BEFORE unloading.
-                    Path worldPath = resolveWorldPath(meta);
+                    Path worldPath = worldService.resolveWorldPath(meta);
                     worldService.unloadBukkitWorld(meta);
 
                     plugin.getIoExecutor().submit(() -> {
@@ -334,30 +334,6 @@ public class SnapshotService {
         }
 
         return future;
-    }
-
-    /**
-     * Returns the world's actual data folder.  When the world is currently loaded
-     * in Bukkit, {@code world.getWorldFolder()} is the authoritative source —
-     * Paper may store world data at a path that differs from the folder name we
-     * stored at creation time.  Falls back to the computed path when the world is
-     * not loaded (e.g. CLOSED worlds, or worlds that Bukkit can't find by name).
-     *
-     * <strong>Must be called on the main thread.</strong>
-     */
-    private @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {
-        org.bukkit.World world = Bukkit.getWorld(meta.getFolderName());
-        Path computed = new File(Bukkit.getWorldContainer(), meta.getFolderName())
-                .toPath().toAbsolutePath().normalize();
-        if (world == null) return computed;
-
-        Path actual = world.getWorldFolder().toPath().toAbsolutePath().normalize();
-        if (!actual.equals(computed)) {
-            logger.warning("[Blueprint] World folder mismatch for '" + meta.getName() + "'!"
-                    + " Computed: " + computed + "  Actual (from Bukkit): " + actual
-                    + "  — using actual path for file operations.");
-        }
-        return actual;
     }
 
     /** Removes oldest snapshots if the per-world limit is exceeded. */

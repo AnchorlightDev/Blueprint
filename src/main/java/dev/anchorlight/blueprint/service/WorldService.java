@@ -56,6 +56,63 @@ public class WorldService {
     }
 
     /**
+     * Registers an externally-prepared world with Blueprint and immediately loads it.
+     *
+     * <p>Unlike {@link #createWorld}, this method does not create a spawn platform and
+     * will not overwrite existing region data — it simply registers the name, fires
+     * WorldCreator (so Paper can locate the dimension), applies build-world rules, and
+     * saves {@code level.dat} if it was absent.</p>
+     *
+     * <strong>Must be called on the main thread.</strong>
+     *
+     * @throws IllegalArgumentException if the name is invalid or already registered
+     * @throws StorageException         on database failure
+     */
+    public WorldMetadata importWorld(@NotNull String name, @Nullable UUID actor) throws StorageException {
+        if (!config.isValidWorldName(name)) {
+            throw new IllegalArgumentException("Invalid world name: " + name);
+        }
+        if (storage.getWorld(name) != null) {
+            throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
+        }
+
+        String folderName = config.getContainerDirectory() + "/" + name;
+        Instant now = Instant.now();
+        WorldMetadata meta = new WorldMetadata(name, folderName, actor, WorldStatus.OPEN, now, now, null, null);
+        meta.markOpened();
+        storage.saveWorld(meta);
+        storage.logAudit(AuditAction.IMPORT_WORLD, name, actor, "folder=" + folderName);
+
+        // Load the world — uses VoidGenerator for new chunks so stray chunk requests
+        // don't generate vanilla terrain, but existing region files are untouched.
+        World existing = Bukkit.getWorld(folderName);
+        if (existing != null) {
+            applyBuildWorldRules(existing);
+        } else {
+            File folder = new File(Bukkit.getWorldContainer(), folderName);
+            if (folder.exists()) {
+                try { FileUtil.deleteIfExists(new File(folder, "uid.dat").toPath()); }
+                catch (IOException ignored) {}
+            }
+            WorldCreator creator = new WorldCreator(folderName)
+                    .generator(new VoidGenerator())
+                    .generateStructures(false);
+            World world = creator.createWorld();
+            if (world != null) {
+                applyBuildWorldRules(world);
+                world.save(); // write level.dat if absent; does not touch region files
+                logger.info("[Blueprint] Import loaded '" + name + "' -> actual folder: "
+                        + world.getWorldFolder().getAbsolutePath());
+            } else {
+                logger.warning("[Blueprint] Import: WorldCreator returned null for '" + name + "'");
+            }
+        }
+
+        logger.info("[Blueprint] Imported world '" + name + "' (folder=" + folderName + ")");
+        return meta;
+    }
+
+    /**
      * Creates and registers a new managed world.
      * If {@code autoOpenCreatedWorlds} is true in config, the world is loaded on the main thread.
      *

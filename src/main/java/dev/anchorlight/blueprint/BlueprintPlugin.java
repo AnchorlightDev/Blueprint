@@ -90,6 +90,7 @@ public class BlueprintPlugin extends JavaPlugin {
         dispatcher.register(new HelpCommand(dispatcher, blueprintConfig));
         dispatcher.register(new VersionCommand(this, blueprintConfig));
         dispatcher.register(new CreateCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new ImportCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new ListCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new TpCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new HubCommand(blueprintConfig));

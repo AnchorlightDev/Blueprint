@@ -83,14 +83,19 @@ public class SnapshotService {
             String snapshotId = "snap-" + SNAP_FMT.format(Instant.now());
             boolean wasOpen   = meta.getStatus() == WorldStatus.OPEN || meta.getStatus() == WorldStatus.LOCKED;
 
-            // Unload world on main thread before copying
+            // Must run on main thread: get world folder before unloading, then unload.
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
+                    // Capture the authoritative folder from Bukkit BEFORE unloading.
+                    // world.getWorldFolder() may differ from our computed path in some
+                    // Paper configurations.
+                    Path worldPath = resolveWorldPath(meta);
+
                     if (wasOpen) worldService.unloadBukkitWorld(meta);
 
                     plugin.getIoExecutor().submit(() -> {
                         try {
-                            doCreateSnapshot(meta, snapshotId, actor, wasOpen, future);
+                            doCreateSnapshot(meta, snapshotId, actor, wasOpen, worldPath, future);
                         } catch (Exception e) {
                             opLocks.unlock(worldName);
                             future.completeExceptionally(e);
@@ -113,10 +118,10 @@ public class SnapshotService {
             @NotNull String snapshotId,
             @Nullable UUID actor,
             boolean wasOpen,
+            @NotNull Path worldPath,
             @NotNull CompletableFuture<SnapshotMetadata> future) throws IOException, StorageException {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path snapshotsDir   = worldPath.resolve("snapshots");
         Path snapDir        = snapshotsDir.resolve(snapshotId).normalize();
 
@@ -125,8 +130,10 @@ public class SnapshotService {
 
         logger.info("[Blueprint] Snapshot path: " + snapDir);
         logger.info("[Blueprint] World path: " + worldPath);
+        logger.info("[Blueprint] World path size before snapshot: " + FileUtil.directorySize(worldPath) + " bytes");
         logger.info("[Blueprint] Creating snapshot '" + snapshotId + "' for world '" + meta.getName() + "'...");
         FileUtil.copyDirectory(worldPath, snapDir, List.of("snapshots"));
+        logger.info("[Blueprint] Snapshot size after copy: " + FileUtil.directorySize(snapDir) + " bytes");
 
         // Prune oldest snapshots if limit exceeded
         pruneOldSnapshots(meta.getName(), worldPath);
@@ -192,12 +199,13 @@ public class SnapshotService {
             // Unload on main thread
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 try {
-                    // Always try to unload to ensure players are evacuated and file locks released
+                    // Capture the authoritative folder BEFORE unloading.
+                    Path worldPath = resolveWorldPath(meta);
                     worldService.unloadBukkitWorld(meta);
 
                     plugin.getIoExecutor().submit(() -> {
                         try {
-                            doRestore(meta, snap, actor, wasOpen, future);
+                            doRestore(meta, snap, actor, wasOpen, worldPath, future);
                         } catch (Exception e) {
                             opLocks.unlock(worldName);
                             future.completeExceptionally(e);
@@ -220,6 +228,7 @@ public class SnapshotService {
             @NotNull SnapshotMetadata snap,
             @Nullable UUID actor,
             boolean wasOpen,
+            @NotNull Path worldPath,
             @NotNull CompletableFuture<Void> future) throws IOException, StorageException {
 
         // Log initial info
@@ -227,7 +236,6 @@ public class SnapshotService {
         logger.info("[Blueprint] Snapshot ID: " + snap.getSnapshotId());
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path snapshotsDir   = worldPath.resolve("snapshots");
         Path snapDir        = snapshotsDir.resolve(snap.getSnapshotId()).normalize();
 
@@ -236,6 +244,8 @@ public class SnapshotService {
 
         logger.info("[Blueprint] Snapshot path: " + snapDir);
         logger.info("[Blueprint] World path: " + worldPath);
+        logger.info("[Blueprint] Snapshot size: " + FileUtil.directorySize(snapDir) + " bytes");
+        logger.info("[Blueprint] World path size before restore: " + FileUtil.directorySize(worldPath) + " bytes");
 
         // Auto-backup before restoring
         if (config.isAutoBackupBeforeRestore()) {
@@ -253,6 +263,7 @@ public class SnapshotService {
         logger.info("[Blueprint] Restoring snapshot '" + snap.getSnapshotId() + "' into '" + meta.getName() + "'...");
         FileUtil.deleteDirectory(worldPath, List.of("snapshots"));
         FileUtil.copyDirectory(snapDir, worldPath, List.of("snapshots"));
+        logger.info("[Blueprint] World path size after restore: " + FileUtil.directorySize(worldPath) + " bytes");
 
         // Remove world-unique files so Bukkit assigns a fresh UID
         FileUtil.deleteIfExists(worldPath.resolve("uid.dat"));
@@ -323,6 +334,30 @@ public class SnapshotService {
         }
 
         return future;
+    }
+
+    /**
+     * Returns the world's actual data folder.  When the world is currently loaded
+     * in Bukkit, {@code world.getWorldFolder()} is the authoritative source —
+     * Paper may store world data at a path that differs from the folder name we
+     * stored at creation time.  Falls back to the computed path when the world is
+     * not loaded (e.g. CLOSED worlds, or worlds that Bukkit can't find by name).
+     *
+     * <strong>Must be called on the main thread.</strong>
+     */
+    private @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {
+        org.bukkit.World world = Bukkit.getWorld(meta.getFolderName());
+        Path computed = new File(Bukkit.getWorldContainer(), meta.getFolderName())
+                .toPath().toAbsolutePath().normalize();
+        if (world == null) return computed;
+
+        Path actual = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+        if (!actual.equals(computed)) {
+            logger.warning("[Blueprint] World folder mismatch for '" + meta.getName() + "'!"
+                    + " Computed: " + computed + "  Actual (from Bukkit): " + actual
+                    + "  — using actual path for file operations.");
+        }
+        return actual;
     }
 
     /** Removes oldest snapshots if the per-world limit is exceeded. */

@@ -263,6 +263,10 @@ public class WorldService {
 
         File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
         boolean isNew = !folder.exists() || !new File(folder, "level.dat").exists();
+        logger.info("[Blueprint] loadBukkitWorld '" + meta.getName() + "'"
+                + " folder=" + folder.getAbsolutePath()
+                + " exists=" + folder.exists()
+                + " isNew=" + isNew);
 
         // Delete uid.dat to avoid UUID conflicts
         if (folder.exists()) {

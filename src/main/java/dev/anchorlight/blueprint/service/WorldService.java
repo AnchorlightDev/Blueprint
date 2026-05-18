@@ -342,34 +342,35 @@ public class WorldService {
             return;
         }
 
-        File folder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        boolean isNew = !folder.exists() || !new File(folder, "level.dat").exists();
-        logger.info("[Blueprint] loadBukkitWorld '" + meta.getName() + "'"
-                + " folder=" + folder.getAbsolutePath()
-                + " exists=" + folder.exists()
-                + " isNew=" + isNew);
-
-        // Delete uid.dat to avoid UUID conflicts
-        if (folder.exists()) {
-            try {
-                FileUtil.deleteIfExists(new File(folder, "uid.dat").toPath());
-            } catch (IOException ignored) {}
+        // Clean up uid.dat at the computed path to avoid UUID conflicts on reload.
+        File computedFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
+        if (computedFolder.exists()) {
+            try { FileUtil.deleteIfExists(new File(computedFolder, "uid.dat").toPath()); }
+            catch (IOException ignored) {}
         }
 
-        // Always use VoidGenerator so restored/existing worlds don't sprout vanilla
-        // terrain in unvisited chunks.
+        // Always use VoidGenerator — existing chunks load from region files regardless.
         WorldCreator creator = new WorldCreator(meta.getFolderName())
                 .generator(new VoidGenerator())
                 .generateStructures(false);
-
         World world = creator.createWorld();
         if (world != null) {
             applyBuildWorldRules(world);
+
+            // Determine "new" from the ACTUAL storage folder (not the computed path).
+            // Paper may map blueprint/<name> to world/dimensions/minecraft/blueprint/<name>/,
+            // which would make the computed-path level.dat check always return isNew=true
+            // even for worlds with 200MB of existing region data.
+            Path actualFolder = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+            boolean isNew = !Files.isDirectory(actualFolder.resolve("region"));
+            logger.info("[Blueprint] loadBukkitWorld '" + meta.getName() + "'"
+                    + " actual=" + actualFolder + " isNew=" + isNew);
+
             if (isNew) {
                 world.setSpawnLocation(0, 65, 0);
                 generateSpawnPlatform(world);
-                world.save();
             }
+            world.save();
         }
     }
 

@@ -8,7 +8,10 @@ import dev.anchorlight.blueprint.model.AuditAction;
 import dev.anchorlight.blueprint.model.WorldMetadata;
 import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.util.FileUtil;
+import dev.anchorlight.blueprint.util.VoidGenerator;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -105,6 +108,13 @@ public class CloneService {
                 try {
                     // Capture the authoritative source folder BEFORE unloading.
                     Path sourceActualPath = worldService.resolveWorldPath(sourceMeta);
+
+                    // Probe the target world to discover where Paper will actually store
+                    // it. WorldCreator("blueprint/<name>") maps to a Paper dimension path
+                    // (e.g. world/dimensions/minecraft/blueprint/<name>/) that differs from
+                    // the computed Bukkit.getWorldContainer()+"/blueprint/<name>" path.
+                    Path targetActualPath = probeTargetPath(targetName);
+
                     if (sourceWasOpen) {
                         worldService.unloadBukkitWorld(sourceMeta);
                     }
@@ -112,7 +122,7 @@ public class CloneService {
                     // Dispatch file copy to IO executor
                     plugin.getIoExecutor().submit(() -> {
                         try {
-                            performCopy(sourceMeta, sourceActualPath, targetName, actor, sourceWasOpen, future);
+                            performCopy(sourceMeta, sourceActualPath, targetActualPath, targetName, actor, sourceWasOpen, future);
                         } catch (Exception e) {
                             opLocks.unlock(sourceName);
                             opLocks.unlock(targetName);
@@ -133,18 +143,41 @@ public class CloneService {
         return future;
     }
 
+    /**
+     * Discovers the actual on-disk path Paper will use for a new target world by
+     * briefly creating and immediately unloading it (save=false so no chunk data
+     * is written). Paper may route "blueprint/&lt;name&gt;" through its dimension
+     * storage rather than the world container root.
+     *
+     * <strong>Must be called on the main thread.</strong>
+     */
+    private @NotNull Path probeTargetPath(@NotNull String targetName) {
+        String targetFolder = config.getContainerDirectory() + "/" + targetName;
+        WorldCreator creator = new WorldCreator(targetFolder)
+                .generator(new VoidGenerator())
+                .generateStructures(false);
+        World world = creator.createWorld();
+        if (world == null) {
+            logger.warning("[Blueprint] probeTargetPath: WorldCreator returned null for '" + targetName + "'; falling back to computed path");
+            return new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
+        }
+        Path actualPath = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+        Bukkit.unloadWorld(world, false); // discard empty world — copy will overwrite its files
+        logger.info("[Blueprint] Clone target actual path: " + actualPath);
+        return actualPath;
+    }
+
     private void performCopy(
             @NotNull WorldMetadata sourceMeta,
             @NotNull Path sourceDir,
+            @NotNull Path targetDir,
             @NotNull String targetName,
             @Nullable UUID actor,
             boolean sourceWasOpen,
             @NotNull CompletableFuture<WorldMetadata> future) throws IOException, StorageException {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        // Use the same folder scheme as WorldService.createWorld: containerDir/name
         String targetFolder = config.getContainerDirectory() + "/" + targetName;
-        Path targetDir      = new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
 
         FileUtil.ensureInsideDirectory(worldContainer, sourceDir);
         FileUtil.ensureInsideDirectory(worldContainer, targetDir);

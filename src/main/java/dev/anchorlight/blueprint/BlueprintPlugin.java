@@ -76,6 +76,24 @@ public class BlueprintPlugin extends JavaPlugin {
             return;
         }
 
+        // ── 3b. Verify world-container ────────────────────────────────────
+        // Blueprint requires bukkit.yml  →  settings:  world-container: blueprint
+        // so that Bukkit.getWorldContainer() returns the blueprint/ sub-folder and
+        // WorldCreator("myworld") creates worlds at blueprint/myworld/ directly.
+        // Without this, worlds land in the server root under arbitrary names.
+        String expectedContainer = blueprintConfig.getContainerDirectory();
+        File   worldContainer    = getServer().getWorldContainer();
+        if (!worldContainer.getName().equals(expectedContainer)) {
+            getLogger().warning("[Blueprint] *** SETUP REQUIRED ***");
+            getLogger().warning("[Blueprint] Blueprint worlds should live at ./" + expectedContainer + "/<name>/");
+            getLogger().warning("[Blueprint] Add the following to bukkit.yml and restart:");
+            getLogger().warning("[Blueprint]   settings:");
+            getLogger().warning("[Blueprint]     world-container: " + expectedContainer);
+            getLogger().warning("[Blueprint] Without this, worlds may be placed in an unexpected location.");
+        } else {
+            getLogger().info("[Blueprint] World container: " + worldContainer.getAbsolutePath());
+        }
+
         // ── 4. Services ───────────────────────────────────────────────────
         ioExecutor     = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "Blueprint-IO");
@@ -165,10 +183,10 @@ public class BlueprintPlugin extends JavaPlugin {
 
     /**
      * Returns the Bukkit folder name for a Blueprint world.
-     * Worlds are stored via Paper's dimension routing:
-     * {@code blueprint/<name>} → {@code <mainWorld>/dimensions/minecraft/blueprint/<name>/}
+     * With {@code settings.world-container: blueprint} in bukkit.yml, this is
+     * the plain world name — Bukkit maps it to {@code blueprint/<name>/} on disk.
      */
     public String worldFolderName(String name) {
-        return blueprintConfig.getContainerDirectory() + "/" + name;
+        return name;
     }
 }

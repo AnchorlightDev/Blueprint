@@ -6,12 +6,11 @@ storage:
   type: yaml
 
 worlds:
-  # Prefix used to derive world folder names — worlds are stored flat in the
-  # server root as: <serverRoot>/<folder-prefix><name>/
-  # Example with default prefix: /server/blueprint_myworld/
-  # container-directory is kept for storage/snapshot path labelling only.
+  # The sub-folder that holds all Blueprint worlds.  MUST match bukkit.yml:
+  #   settings:
+  #     world-container: blueprint
+  # Worlds are then stored at: <serverRoot>/blueprint/<name>/
   container-directory: "blueprint"
-  folder-prefix: "blueprint_"
   # Number of worlds shown per /blueprint list page
   page-size: 10
   # World to send players to when a world is unloaded/closed

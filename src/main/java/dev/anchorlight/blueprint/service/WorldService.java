@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -75,30 +76,13 @@ public class WorldService {
             throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
         }
 
-        String folderName = config.getContainerDirectory() + "/" + name;
+        String folderName  = name;
+        Path   importPath  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(name);
 
-        // User-visible drop location: /server/blueprint/<name>/
-        Path userPath = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize()
-                .resolve(config.getContainerDirectory()).resolve(name);
-        // Where Paper's dimension routing will actually store the world
-        Path dimensionPath = computeDimensionPath(folderName);
-
-        // Migrate from user-visible location to dimension path if needed
-        if (hasRegionData(userPath) && !hasRegionData(dimensionPath)) {
-            logger.info("[Blueprint] Migrating world data: " + userPath + " -> " + dimensionPath);
-            try {
-                FileUtil.copyDirectory(userPath, dimensionPath);
-                FileUtil.deleteDirectory(userPath);
-                logger.info("[Blueprint] Migration complete.");
-            } catch (IOException e) {
-                throw new IllegalStateException("Failed to migrate world data: " + e.getMessage());
-            }
-        }
-
-        if (!hasRegionData(dimensionPath)) {
+        if (!hasRegionData(importPath)) {
             throw new IllegalArgumentException(
                     "No world data found for '" + name + "'. "
-                    + "Copy your region/, entities/, and poi/ folders to:\n  " + userPath
+                    + "Copy your region/, entities/, and poi/ folders to:\n  " + importPath
                     + "\nthen run /bp import " + name + " again.");
         }
 
@@ -125,24 +109,6 @@ public class WorldService {
         logger.info("[Blueprint] Imported world '" + name + "' -> actual path: "
                 + world.getWorldFolder().toPath().toAbsolutePath().normalize());
         return meta;
-    }
-
-    /**
-     * Computes the actual on-disk path Paper uses for a dimension-routed world.
-     * Any WorldCreator name containing '/' triggers Paper to store the world at
-     * {@code <mainWorld>/dimensions/minecraft/<folderName>/} rather than at the
-     * world container root.
-     */
-    private @NotNull Path computeDimensionPath(@NotNull String folderName) {
-        World mainWorld = Bukkit.getWorld(config.getFallbackWorld());
-        if (mainWorld == null && !Bukkit.getWorlds().isEmpty()) {
-            mainWorld = Bukkit.getWorlds().get(0);
-        }
-        if (mainWorld != null) {
-            return mainWorld.getWorldFolder().toPath().toAbsolutePath().normalize()
-                    .resolve("dimensions/minecraft").resolve(folderName);
-        }
-        return Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(folderName);
     }
 
     private boolean hasRegionData(@NotNull Path worldPath) {
@@ -172,11 +138,10 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getContainerDirectory() + "/" + name;
-
-        // Ensure no folder collision at the dimension path
-        if (Files.exists(computeDimensionPath(folderName))) {
-            throw new IllegalArgumentException("World folder already exists on disk: " + name);
+        String folderName  = name;
+        File   worldFolder = new File(Bukkit.getWorldContainer(), folderName);
+        if (worldFolder.exists()) {
+            throw new IllegalArgumentException("World folder already exists on disk: " + folderName);
         }
 
         Instant now = Instant.now();
@@ -331,13 +296,9 @@ public class WorldService {
             }
         }
 
-        // Validate the path is within the expected blueprint dimensions area
-        String containerPrefix = config.getContainerDirectory() + "/";
-        if (!meta.getFolderName().startsWith(containerPrefix)
-                && !meta.getFolderName().startsWith(config.getContainerDirectory() + "\\")) {
-            throw new SecurityException("World folder '" + meta.getFolderName()
-                    + "' is not in the expected container directory.");
-        }
+        // Validate the world folder is inside the configured world container
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        FileUtil.ensureInsideDirectory(worldContainer, worldPath);
         FileUtil.deleteDirectory(worldPath);
 
         storage.deleteWorld(name);
@@ -361,7 +322,8 @@ public class WorldService {
         if (world != null) {
             return world.getWorldFolder().toPath().toAbsolutePath().normalize();
         }
-        return computeDimensionPath(meta.getFolderName());
+        return new File(Bukkit.getWorldContainer(), meta.getFolderName())
+                .toPath().toAbsolutePath().normalize();
     }
 
     void loadBukkitWorld(@NotNull WorldMetadata meta) {
@@ -371,9 +333,12 @@ public class WorldService {
             return;
         }
 
-        // Clean up uid.dat at the dimension path to avoid UUID conflicts on reload.
-        try { FileUtil.deleteIfExists(computeDimensionPath(meta.getFolderName()).resolve("uid.dat")); }
-        catch (IOException ignored) {}
+        // Clean up uid.dat to avoid UUID conflicts on reload.
+        File worldFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
+        if (worldFolder.exists()) {
+            try { FileUtil.deleteIfExists(new File(worldFolder, "uid.dat").toPath()); }
+            catch (IOException ignored) {}
+        }
 
         // Always use VoidGenerator — existing chunks load from region files regardless.
         WorldCreator creator = new WorldCreator(meta.getFolderName())
@@ -530,10 +495,11 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getContainerDirectory() + "/" + newName;
+        String newFolderName = newName;
         // Capture old actual path before any potential unload
         Path oldFolder = resolveWorldPath(meta);
-        Path newFolder = computeDimensionPath(newFolderName);
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path newFolder = worldContainer.resolve(newFolderName);
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("World '" + newName + "' already exists on disk.");

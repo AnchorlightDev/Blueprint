@@ -19,28 +19,53 @@ Blueprint does **not** use NMS, CraftBukkit internals, or reflection-based versi
 
 ## Installation
 
+### 1. Configure bukkit.yml
+
+Blueprint requires Paper to use a dedicated world sub-folder. Add this to your server's `bukkit.yml` **before** starting the server with Blueprint for the first time:
+
+```yaml
+settings:
+  world-container: blueprint
+```
+
+This tells Paper to store all worlds inside `blueprint/` relative to the server root. Blueprint worlds then live at predictable, flat paths:
+
+```
+/server/
+  blueprint/
+    world/          ← your main world (move it here once, see below)
+    world_nether/
+    world_the_end/
+    myworld/        ← a Blueprint world
+    another/        ← another Blueprint world
+```
+
+> **One-time migration:** Stop the server, move your existing `world/`, `world_nether/`, and `world_the_end/` folders into the new `blueprint/` directory, add the `world-container` setting, then start the server.
+
+### 2. Install the plugin
+
 1. Download `Blueprint-0.1.0.jar` from the releases page.
-2. Place it in your server's `plugins/` folder.
-3. Start the server. Blueprint will generate `plugins/Blueprint/config.yml`.
+2. Place it in `plugins/`.
+3. Start the server. Blueprint generates `plugins/Blueprint/config.yml`.
 4. Edit `config.yml` as needed, then restart.
 
 ---
 
 ## World Storage
 
-Blueprint uses Paper's dimension routing to store worlds. All managed worlds live at:
+With `world-container: blueprint` set, every world on the server — including your main worlds — lives under `blueprint/`. Blueprint-managed worlds are stored at:
 
 ```
-<mainWorld>/dimensions/minecraft/blueprint/<name>/
+blueprint/<name>/
 ```
 
-For example, a world named `myworld` on a server whose main world is `world` is stored at:
+For example, a world named `myworld` is stored at:
 
 ```
-world/dimensions/minecraft/blueprint/myworld/
+/server/blueprint/myworld/
 ```
 
-This is handled automatically — you never need to manage these paths directly except when importing existing worlds (see below).
+No prefixes, no sub-namespacing, no hidden dimension folders.
 
 ---
 
@@ -71,19 +96,18 @@ All commands support the alias `/bp`.
 
 ### Importing an existing world
 
-To import a world you already have on disk:
+To bring an existing world folder into Blueprint:
 
-1. Create the directory `blueprint/` inside your server root if it doesn't exist.
-2. Copy your world folder (the one containing `region/`, `entities/`, `poi/`, etc.) into `blueprint/` and name it after the world you want: `blueprint/<name>/`.
-3. Run `/bp import <name>`.
+1. Copy the world folder into `blueprint/` and name it after the world you want, e.g. `blueprint/myworld/` (it should contain `region/`, `entities/`, `poi/`, etc.).
+2. Run `/bp import myworld`.
 
-Blueprint will migrate the files into the correct dimension path and register the world.
+Blueprint validates that region data exists before registering the world.
 
 ---
 
 ## Permissions
 
-All permissions default to `true` except `blueprint.bypass.lock`, which defaults to `op`. Assign `blueprint.admin` to grant everything at once.
+All permissions default to `true` except `blueprint.bypass.lock` which defaults to `op`. Assign `blueprint.admin` to grant everything at once.
 
 | Node | Description |
 |------|-------------|
@@ -117,7 +141,7 @@ storage:
   type: yaml
 
 worlds:
-  # Internal name used for the dimension routing path (blueprint/<name>)
+  # Must match settings.world-container in bukkit.yml
   container-directory: "blueprint"
   # Number of worlds shown per /blueprint list page
   page-size: 10
@@ -154,13 +178,16 @@ messages:
 
 ## Snapshot Layout
 
-Snapshots are stored inside the world's dimension folder:
+Snapshots are stored inside the world folder:
 
 ```
-world/dimensions/minecraft/blueprint/<worldName>/
+blueprint/<worldName>/
+  region/
+  entities/
+  ...
   snapshots/
-    snap-2026-05-07-153022/         <- snapshot (full world copy, excluding snapshots/)
-    pre-restore-2026-05-07-160000/  <- auto-backup created before a restore
+    snap-2026-05-07-153022/         ← snapshot (full world copy, excluding snapshots/)
+    pre-restore-2026-05-07-160000/  ← auto-backup created before a restore
 ```
 
 Snapshot IDs follow the pattern `snap-YYYY-MM-DD-HHmmss` (UTC). Pre-restore backups use `pre-restore-YYYY-MM-DD-HHmmss`.
@@ -173,5 +200,5 @@ Snapshot IDs follow the pattern `snap-YYYY-MM-DD-HHmmss` (UTC). Pre-restore back
 - **Always close a world** before cloning or restoring. Blueprint does this automatically, but a crash mid-operation could leave the folder in a partial state.
 - **`auto-backup-before-restore: true`** is strongly recommended in production. It creates a named pre-restore snapshot so you can recover from accidental restores.
 - **`max-per-world: 0`** disables the snapshot limit. Manage storage yourself if you use this.
-- Blueprint never touches `world`, `world_nether`, or `world_the_end`. All managed worlds live under the `blueprint/` dimension container.
+- Blueprint deletes and renames world folders only within the configured `world-container` directory. It will never touch folders outside that container.
 - The `uid.dat` and `session.lock` files are removed from cloned and restored worlds to prevent world UID conflicts.

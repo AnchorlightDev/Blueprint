@@ -46,12 +46,6 @@ public class BlueprintPlugin extends JavaPlugin {
     /** Single-threaded executor for all async file I/O. */
     private ExecutorService ioExecutor;
 
-    /**
-     * True when the world container was successfully redirected to
-     * {@code <serverRoot>/blueprint/} via reflection. When false, worlds fall
-     * back to flat {@code blueprint_<name>} names in the server root.
-     */
-    private boolean worldContainerSet = false;
 
     @Override
     public void onEnable() {
@@ -80,33 +74,6 @@ public class BlueprintPlugin extends JavaPlugin {
             getLogger().severe("Failed to initialize storage: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
-        }
-
-        // ── 3b. World container ───────────────────────────────────────────
-        // Route Blueprint worlds into <serverRoot>/blueprint/ so paths are
-        // predictable (/server/blueprint/<name>/) and don't trigger Paper's
-        // dimension routing (which fires for any WorldCreator name with '/').
-        //
-        // Server.setWorldContainer was removed from the Bukkit interface but
-        // CraftServer still carries the method — reach it via reflection.
-        // If unavailable, fall back to a "blueprint_" prefix at the server root.
-        File worldContainerDir = new File(getServer().getWorldContainer(),
-                blueprintConfig.getContainerDirectory());
-        if (!worldContainerDir.exists() && !worldContainerDir.mkdirs()) {
-            getLogger().warning("[Blueprint] Could not create world container directory: " + worldContainerDir);
-        }
-        try {
-            getServer().getClass()
-                    .getMethod("setWorldContainer", File.class)
-                    .invoke(getServer(), worldContainerDir);
-            worldContainerSet = true;
-            getLogger().info("[Blueprint] World container: " + worldContainerDir.getAbsolutePath());
-        } catch (NoSuchMethodException e) {
-            getLogger().warning("[Blueprint] setWorldContainer unavailable in this Paper build — "
-                    + "worlds will use '" + blueprintConfig.getWorldFolderPrefix() + "<name>' naming at server root.");
-        } catch (Exception e) {
-            getLogger().warning("[Blueprint] Could not redirect world container ("
-                    + e.getClass().getSimpleName() + ") — using prefix fallback.");
         }
 
         // ── 4. Services ───────────────────────────────────────────────────
@@ -196,19 +163,12 @@ public class BlueprintPlugin extends JavaPlugin {
     public OperationLockService getOpLocks() { return opLocks; }
     public ExecutorService getIoExecutor() { return ioExecutor; }
 
-    /** Whether the world container was successfully redirected to blueprint/. */
-    public boolean isWorldContainerSet() { return worldContainerSet; }
-
     /**
      * Returns the Bukkit folder name for a Blueprint world.
-     * <ul>
-     *   <li>When the world container is redirected to {@code blueprint/}:
-     *       returns just {@code name} → world lives at {@code blueprint/<name>/}.</li>
-     *   <li>Otherwise: returns {@code blueprint_<name>} → world lives at
-     *       {@code <serverRoot>/blueprint_<name>/} (flat fallback).</li>
-     * </ul>
+     * Worlds are stored via Paper's dimension routing:
+     * {@code blueprint/<name>} → {@code <mainWorld>/dimensions/minecraft/blueprint/<name>/}
      */
     public String worldFolderName(String name) {
-        return worldContainerSet ? name : blueprintConfig.getWorldFolderPrefix() + name;
+        return blueprintConfig.getContainerDirectory() + "/" + name;
     }
 }

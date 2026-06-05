@@ -79,8 +79,8 @@ public class SessionListener implements Listener {
     private boolean isBlueprintWorld(@NotNull World world) {
         String folderName = world.getName();
 
-        // Fast path: Blueprint worlds always use the configured prefix
-        if (!folderName.startsWith(config.getWorldFolderPrefix())) return false;
+        // Fast path: Blueprint worlds always use "blueprint/<name>" as their Bukkit name
+        if (!folderName.startsWith(config.getContainerDirectory() + "/")) return false;
 
         // Confirm via DB to avoid false-positives from non-Blueprint worlds
         // that happen to share the prefix (rare, but correct to check)

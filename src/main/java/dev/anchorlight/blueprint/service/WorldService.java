@@ -77,38 +77,52 @@ public class WorldService {
         }
 
         String folderName = config.getContainerDirectory() + "/" + name;
+
+        // Load the world to discover where Paper actually stores it.
+        // WorldCreator("blueprint/<name>") routes to world/dimensions/minecraft/blueprint/<name>/
+        // which differs from the computed Bukkit.getWorldContainer()+"/blueprint/<name>" path.
+        World world = Bukkit.getWorld(folderName);
+        if (world == null) {
+            WorldCreator creator = new WorldCreator(folderName)
+                    .generator(new VoidGenerator())
+                    .generateStructures(false);
+            world = creator.createWorld();
+            if (world == null) {
+                throw new IllegalStateException("Could not load world '" + name + "' — WorldCreator returned null.");
+            }
+        }
+
+        // Validate that actual chunk data exists at the real storage path.
+        // If there are no .mca region files, this is a blank dimension and we refuse to import it.
+        Path actualPath = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+        Path regionDir  = actualPath.resolve("region");
+        boolean hasData = false;
+        if (Files.isDirectory(regionDir)) {
+            try (var files = Files.list(regionDir)) {
+                hasData = files.anyMatch(p -> p.getFileName().toString().endsWith(".mca"));
+            } catch (IOException e) {
+                hasData = false;
+            }
+        }
+
+        if (!hasData) {
+            Bukkit.unloadWorld(world, false); // discard the blank world — nothing was saved to DB yet
+            throw new IllegalArgumentException(
+                    "No world data found for '" + name + "'. "
+                    + "Copy your region/, entities/, and poi/ folders to: " + actualPath
+                    + " — then run /bp import " + name + " again.");
+        }
+
+        // Data confirmed — register in DB, then apply rules and flush level.dat
         Instant now = Instant.now();
         WorldMetadata meta = new WorldMetadata(name, folderName, actor, WorldStatus.OPEN, now, now, null, null);
         meta.markOpened();
         storage.saveWorld(meta);
         storage.logAudit(AuditAction.IMPORT_WORLD, name, actor, "folder=" + folderName);
 
-        // Load the world — uses VoidGenerator for new chunks so stray chunk requests
-        // don't generate vanilla terrain, but existing region files are untouched.
-        World existing = Bukkit.getWorld(folderName);
-        if (existing != null) {
-            applyBuildWorldRules(existing);
-        } else {
-            File folder = new File(Bukkit.getWorldContainer(), folderName);
-            if (folder.exists()) {
-                try { FileUtil.deleteIfExists(new File(folder, "uid.dat").toPath()); }
-                catch (IOException ignored) {}
-            }
-            WorldCreator creator = new WorldCreator(folderName)
-                    .generator(new VoidGenerator())
-                    .generateStructures(false);
-            World world = creator.createWorld();
-            if (world != null) {
-                applyBuildWorldRules(world);
-                world.save(); // write level.dat if absent; does not touch region files
-                logger.info("[Blueprint] Import loaded '" + name + "' -> actual folder: "
-                        + world.getWorldFolder().getAbsolutePath());
-            } else {
-                logger.warning("[Blueprint] Import: WorldCreator returned null for '" + name + "'");
-            }
-        }
-
-        logger.info("[Blueprint] Imported world '" + name + "' (folder=" + folderName + ")");
+        applyBuildWorldRules(world);
+        world.save();
+        logger.info("[Blueprint] Imported world '" + name + "' -> actual path: " + actualPath);
         return meta;
     }
 

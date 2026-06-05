@@ -6,10 +6,12 @@ storage:
   type: yaml
 
 worlds:
-  # Directory where managed worlds are stored (relative to server root)
+  # Subfolder under the server root where Blueprint stores all managed worlds.
+  # Blueprint sets Bukkit's world container to this directory on startup, so
+  # worlds live at: <serverRoot>/<container-directory>/<folder-prefix><name>/
+  # Example with defaults: /server/blueprint/blueprint_myworld/
   container-directory: "blueprint"
-  # Prefix applied to Bukkit world folder names (e.g. blueprint_myworld)
-  # This is legacy and mostly ignored now that container-directory is used
+  # Prefix applied to every world folder name inside the container directory.
   folder-prefix: "blueprint_"
   # Number of worlds shown per /blueprint list page
   page-size: 10

@@ -74,6 +74,21 @@ public class BlueprintPlugin extends JavaPlugin {
             return;
         }
 
+        // ── 3b. World container ───────────────────────────────────────────
+        // Redirect Bukkit's world container to <serverRoot>/blueprint/ so that
+        // WorldCreator("blueprint_name") stores worlds at /blueprint/blueprint_name/
+        // rather than triggering Paper's dimension routing (which kicks in for any
+        // world name containing '/') and burying data inside world/dimensions/minecraft/.
+        // The main world ("world") is already loaded before plugins start, so this
+        // only affects worlds that Blueprint creates from this point forward.
+        File worldContainerDir = new File(getServer().getWorldContainer(),
+                blueprintConfig.getContainerDirectory());
+        if (!worldContainerDir.exists() && !worldContainerDir.mkdirs()) {
+            getLogger().warning("Could not create world container directory: " + worldContainerDir);
+        }
+        getServer().setWorldContainer(worldContainerDir);
+        getLogger().info("Blueprint world container: " + worldContainerDir.getAbsolutePath());
+
         // ── 4. Services ───────────────────────────────────────────────────
         ioExecutor     = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "Blueprint-IO");

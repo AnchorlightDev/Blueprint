@@ -76,16 +76,14 @@ public class WorldService {
             throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
         }
 
-        String folderName = config.getContainerDirectory() + "/" + name;
+        String folderName = config.getWorldFolderPrefix() + name;
 
-        // Compute the actual Paper dimension storage path WITHOUT loading the world.
-        // Paper routes WorldCreator("blueprint/<name>") to:
-        //   <overworld>/dimensions/minecraft/blueprint/<name>/
-        // We must check this path BEFORE calling WorldCreator so that blank .mca files
-        // created by a previous failed import do not pass validation.
-        Path overworldFolder = Bukkit.getWorlds().get(0).getWorldFolder().toPath().toAbsolutePath().normalize();
-        Path expectedPath    = overworldFolder.resolve("dimensions/minecraft").resolve(folderName);
-        Path regionDir       = expectedPath.resolve("region");
+        // Check for existing region data at the flat world container path BEFORE
+        // calling WorldCreator, so blank .mca files from previous failed imports
+        // don't pass validation.  With the world container set to <serverRoot>/blueprint/,
+        // the expected path is simply: <worldContainer>/blueprint_<name>/
+        Path expectedPath = new File(Bukkit.getWorldContainer(), folderName).toPath().toAbsolutePath().normalize();
+        Path regionDir    = expectedPath.resolve("region");
 
         boolean hasData = false;
         if (Files.isDirectory(regionDir)) {
@@ -145,7 +143,7 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getContainerDirectory() + "/" + name;
+        String folderName = config.getWorldFolderPrefix() + name;
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -301,10 +299,12 @@ public class WorldService {
         }
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path containerPath  = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
         Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
+        // Safety: world must be inside the Blueprint world container and start with the expected prefix
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
-        FileUtil.ensureInsideDirectory(containerPath, worldPath);
+        if (!meta.getFolderName().startsWith(config.getWorldFolderPrefix())) {
+            throw new SecurityException("World folder '" + meta.getFolderName() + "' does not start with expected prefix '" + config.getWorldFolderPrefix() + "'");
+        }
         FileUtil.deleteDirectory(worldPath);
 
         storage.deleteWorld(name);
@@ -520,13 +520,11 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getContainerDirectory() + "/" + newName;
+        String newFolderName = config.getWorldFolderPrefix() + newName;
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path containerPath   = new File(Bukkit.getWorldContainer(), config.getContainerDirectory()).toPath().toAbsolutePath().normalize();
         Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();
         FileUtil.ensureInsideDirectory(worldContainer, newFolder);
-        FileUtil.ensureInsideDirectory(containerPath, newFolder);
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("Folder '" + newFolderName + "' already exists on disk.");

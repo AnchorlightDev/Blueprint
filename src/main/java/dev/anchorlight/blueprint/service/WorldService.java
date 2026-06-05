@@ -76,25 +76,27 @@ public class WorldService {
             throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
         }
 
-        String folderName = plugin.worldFolderName(name);
+        String folderName    = plugin.worldFolderName(name);
+        Path   expectedPath  = new File(Bukkit.getWorldContainer(), folderName).toPath().toAbsolutePath().normalize();
 
-        // Check for existing region data at the flat world container path BEFORE
-        // calling WorldCreator, so blank .mca files from previous failed imports
-        // don't pass validation.  With the world container set to <serverRoot>/blueprint/,
-        // the expected path is simply: <worldContainer>/blueprint_<name>/
-        Path expectedPath = new File(Bukkit.getWorldContainer(), folderName).toPath().toAbsolutePath().normalize();
-        Path regionDir    = expectedPath.resolve("region");
+        // Also look in <serverRoot>/blueprint/<name>/ — the user-visible organisational
+        // folder.  If data is there but not at the expected location, migrate it now.
+        Path altPath = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize()
+                .resolve(config.getContainerDirectory()).resolve(name);
 
-        boolean hasData = false;
-        if (Files.isDirectory(regionDir)) {
-            try (var files = Files.list(regionDir)) {
-                hasData = files.anyMatch(p -> p.getFileName().toString().endsWith(".mca"));
+        if (!expectedPath.equals(altPath) && !hasRegionData(expectedPath) && hasRegionData(altPath)) {
+            logger.info("[Blueprint] Migrating world data: " + altPath + " -> " + expectedPath);
+            try {
+                FileUtil.copyDirectory(altPath, expectedPath);
+                FileUtil.deleteDirectory(altPath);
+                logger.info("[Blueprint] Migration complete.");
             } catch (IOException e) {
-                hasData = false;
+                throw new IllegalStateException(
+                        "Failed to migrate world data from " + altPath + " to " + expectedPath + ": " + e.getMessage());
             }
         }
 
-        if (!hasData) {
+        if (!hasRegionData(expectedPath)) {
             throw new IllegalArgumentException(
                     "No world data found for '" + name + "'. "
                     + "Copy your region/, entities/, and poi/ folders to:\n  " + expectedPath
@@ -124,6 +126,16 @@ public class WorldService {
         logger.info("[Blueprint] Imported world '" + name + "' -> actual path: "
                 + world.getWorldFolder().toPath().toAbsolutePath().normalize());
         return meta;
+    }
+
+    private boolean hasRegionData(@NotNull Path worldPath) {
+        Path regionDir = worldPath.resolve("region");
+        if (!Files.isDirectory(regionDir)) return false;
+        try (var files = Files.list(regionDir)) {
+            return files.anyMatch(p -> p.getFileName().toString().endsWith(".mca"));
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /**

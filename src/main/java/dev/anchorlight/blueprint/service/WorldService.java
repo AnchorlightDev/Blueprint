@@ -76,7 +76,7 @@ public class WorldService {
             throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
         }
 
-        String folderName = config.getWorldFolderPrefix() + name;
+        String folderName = plugin.worldFolderName(name);
 
         // Check for existing region data at the flat world container path BEFORE
         // calling WorldCreator, so blank .mca files from previous failed imports
@@ -143,7 +143,7 @@ public class WorldService {
             throw new IllegalArgumentException("World already exists: " + name);
         }
 
-        String folderName = config.getWorldFolderPrefix() + name;
+        String folderName = plugin.worldFolderName(name);
 
         // Ensure no folder collision
         File worldFolder = new File(Bukkit.getWorldContainer(), folderName);
@@ -300,10 +300,12 @@ public class WorldService {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path worldPath      = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
-        // Safety: world must be inside the Blueprint world container and start with the expected prefix
         FileUtil.ensureInsideDirectory(worldContainer, worldPath);
-        if (!meta.getFolderName().startsWith(config.getWorldFolderPrefix())) {
-            throw new SecurityException("World folder '" + meta.getFolderName() + "' does not start with expected prefix '" + config.getWorldFolderPrefix() + "'");
+        // When world container is the server root (fallback mode), also enforce the prefix
+        // so we never delete arbitrary directories.
+        if (!plugin.isWorldContainerSet() && !meta.getFolderName().startsWith(config.getWorldFolderPrefix())) {
+            throw new SecurityException("World folder '" + meta.getFolderName()
+                    + "' does not start with expected prefix '" + config.getWorldFolderPrefix() + "'");
         }
         FileUtil.deleteDirectory(worldPath);
 
@@ -520,7 +522,7 @@ public class WorldService {
             throw new IllegalArgumentException("A world named '" + newName + "' already exists.");
         }
 
-        String newFolderName = config.getWorldFolderPrefix() + newName;
+        String newFolderName = plugin.worldFolderName(newName);
         Path worldContainer  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path oldFolder       = new File(Bukkit.getWorldContainer(), meta.getFolderName()).toPath().toAbsolutePath().normalize();
         Path newFolder       = new File(Bukkit.getWorldContainer(), newFolderName).toPath().toAbsolutePath().normalize();

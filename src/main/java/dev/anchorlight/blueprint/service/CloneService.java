@@ -152,7 +152,7 @@ public class CloneService {
      * <strong>Must be called on the main thread.</strong>
      */
     private @NotNull Path probeTargetPath(@NotNull String targetName) {
-        String targetFolder = config.getWorldFolderPrefix() + targetName;
+        String targetFolder = plugin.worldFolderName(targetName);
         WorldCreator creator = new WorldCreator(targetFolder)
                 .generator(new VoidGenerator())
                 .generateStructures(false);
@@ -177,7 +177,7 @@ public class CloneService {
             @NotNull CompletableFuture<WorldMetadata> future) throws IOException, StorageException {
 
         Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        String targetFolder = config.getWorldFolderPrefix() + targetName;
+        String targetFolder = plugin.worldFolderName(targetName);
 
         FileUtil.ensureInsideDirectory(worldContainer, sourceDir);
         FileUtil.ensureInsideDirectory(worldContainer, targetDir);

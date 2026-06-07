@@ -67,7 +67,7 @@ public class BlueprintPlugin extends JavaPlugin {
         }
 
         // ── 3. Storage ────────────────────────────────────────────────────
-        storage = new YamlBlueprintStorage(getDataFolder(), getLogger(), blueprintConfig.getContainerDirectory());
+        storage = new YamlBlueprintStorage(getDataFolder(), getLogger());
         try {
             storage.initializeSchema();
         } catch (StorageException e) {

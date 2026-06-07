@@ -76,13 +76,16 @@ public class WorldService {
             throw new IllegalArgumentException("World '" + name + "' is already registered in Blueprint.");
         }
 
-        String folderName  = name;
-        Path   importPath  = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(name);
+        String folderName = name;
+        // Look for world data in the world container — search case-insensitively on disk
+        // since the folder may have been created with mixed case (e.g. CFCHubExpansion).
+        Path importPath = findImportFolder(name);
 
-        if (!hasRegionData(importPath)) {
+        if (importPath == null) {
+            Path expected = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(name);
             throw new IllegalArgumentException(
                     "No world data found for '" + name + "'. "
-                    + "Copy your region/, entities/, and poi/ folders to:\n  " + importPath
+                    + "Copy your region/, entities/, and poi/ folders to:\n  " + expected
                     + "\nthen run /bp import " + name + " again.");
         }
 
@@ -109,6 +112,53 @@ public class WorldService {
         logger.info("[Blueprint] Imported world '" + name + "' -> actual path: "
                 + world.getWorldFolder().toPath().toAbsolutePath().normalize());
         return meta;
+    }
+
+    /**
+     * Searches the world container for a folder matching {@code name} case-insensitively
+     * and containing region data. If the folder exists under a different case, it is
+     * renamed to the canonical lowercase name so Paper's WorldCreator can find it.
+     * Returns the resolved path, or {@code null} if no matching data is found.
+     */
+    private @Nullable Path findImportFolder(@NotNull String name) {
+        File worldContainer = Bukkit.getWorldContainer();
+        // Exact match first
+        File exact = new File(worldContainer, name);
+        if (hasRegionData(exact.toPath())) return exact.toPath().toAbsolutePath().normalize();
+
+        // Case-insensitive fallback — common when users upload worlds with mixed-case names
+        File[] dirs = worldContainer.listFiles(File::isDirectory);
+        if (dirs == null) return null;
+        for (File dir : dirs) {
+            if (dir.getName().equalsIgnoreCase(name) && hasRegionData(dir.toPath())) {
+                if (!dir.getName().equals(name)) {
+                    // Rename to canonical lowercase so WorldCreator can locate the folder
+                    File canonical = new File(worldContainer, name);
+                    if (dir.renameTo(canonical)) {
+                        logger.info("[Blueprint] Renamed '" + dir.getName() + "' -> '" + name + "' for import.");
+                        return canonical.toPath().toAbsolutePath().normalize();
+                    }
+                    logger.warning("[Blueprint] Could not rename '" + dir.getName() + "'; trying as-is.");
+                }
+                return dir.toPath().toAbsolutePath().normalize();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Computes the on-disk path Paper uses after its LegacyCraftBukkitWorldMigration.
+     * Paper migrates flat world folders (blueprint/&lt;name&gt;/) into the primary world's
+     * dimensions directory: blueprint/world/dimensions/minecraft/&lt;name&gt;/.
+     */
+    private @NotNull Path computeDimensionPath(@NotNull String folderName) {
+        World mainWorld = Bukkit.getWorld(config.getFallbackWorld());
+        if (mainWorld == null && !Bukkit.getWorlds().isEmpty()) mainWorld = Bukkit.getWorlds().get(0);
+        if (mainWorld != null) {
+            return mainWorld.getWorldFolder().toPath().toAbsolutePath().normalize()
+                    .resolve("dimensions/minecraft").resolve(folderName);
+        }
+        return Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(folderName);
     }
 
     private boolean hasRegionData(@NotNull Path worldPath) {
@@ -320,10 +370,11 @@ public class WorldService {
     public @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {
         World world = Bukkit.getWorld(meta.getFolderName());
         if (world != null) {
+            // Authoritative path when loaded — Paper may have migrated the folder.
             return world.getWorldFolder().toPath().toAbsolutePath().normalize();
         }
-        return new File(Bukkit.getWorldContainer(), meta.getFolderName())
-                .toPath().toAbsolutePath().normalize();
+        // For closed worlds: Paper migrates to the dimension path even with world-container set.
+        return computeDimensionPath(meta.getFolderName());
     }
 
     void loadBukkitWorld(@NotNull WorldMetadata meta) {
@@ -333,12 +384,12 @@ public class WorldService {
             return;
         }
 
-        // Clean up uid.dat to avoid UUID conflicts on reload.
-        File worldFolder = new File(Bukkit.getWorldContainer(), meta.getFolderName());
-        if (worldFolder.exists()) {
-            try { FileUtil.deleteIfExists(new File(worldFolder, "uid.dat").toPath()); }
-            catch (IOException ignored) {}
-        }
+        // Clean up uid.dat from both the flat stub folder and the dimension path.
+        try {
+            FileUtil.deleteIfExists(new File(Bukkit.getWorldContainer(), meta.getFolderName())
+                    .toPath().resolve("uid.dat"));
+            FileUtil.deleteIfExists(computeDimensionPath(meta.getFolderName()).resolve("uid.dat"));
+        } catch (IOException ignored) {}
 
         // Always use VoidGenerator — existing chunks load from region files regardless.
         WorldCreator creator = new WorldCreator(meta.getFolderName())
@@ -496,10 +547,10 @@ public class WorldService {
         }
 
         String newFolderName = newName;
-        // Capture old actual path before any potential unload
+        // Capture old actual path before any potential unload (post-migration dimension path)
         Path oldFolder = resolveWorldPath(meta);
-        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path newFolder = worldContainer.resolve(newFolderName);
+        // New folder will also land at the dimension path after Paper migration
+        Path newFolder = computeDimensionPath(newFolderName);
 
         if (Files.exists(newFolder)) {
             throw new IllegalArgumentException("World '" + newName + "' already exists on disk.");

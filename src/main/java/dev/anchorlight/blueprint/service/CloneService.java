@@ -186,9 +186,12 @@ public class CloneService {
 
         FileUtil.copyDirectory(sourceDir, targetDir);
 
-        // Remove files that must not be shared between worlds
+        // Remove files that must not be shared between worlds.
+        // level.dat contains the world UUID — Paper 1.21 uses it to detect duplicates,
+        // so it must be deleted from the clone so Paper regenerates a fresh identity.
         FileUtil.deleteIfExists(targetDir.resolve("uid.dat"));
         FileUtil.deleteIfExists(targetDir.resolve("session.lock"));
+        FileUtil.deleteIfExists(targetDir.resolve("level.dat"));
 
         // Persist clone metadata
         Instant now = Instant.now();

@@ -36,7 +36,7 @@ public class CreateCommand implements SubCommand {
             Messages.send(sender, config, Messages.ERROR_NO_PERMISSION);
             return;
         }
-        if (args.length < 1) {
+        if (args.length != 1) {
             Messages.send(sender, config, "<red>Usage: <yellow>/blueprint " + getUsage());
             return;
         }

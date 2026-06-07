@@ -227,21 +227,27 @@ public class YamlBlueprintStorage implements BlueprintStorage {
     @Override
     public void logAudit(@NotNull AuditAction action, @NotNull String worldName,
                          @Nullable UUID actorUuid, @Nullable String detail) throws StorageException {
-        File auditFile = new File(dataFolder, "audit.yml");
-        YamlBlueprintConfigFile config = new YamlBlueprintConfigFile(auditFile);
-        List<Map<String, Object>> logs = getLogs(config);
+        try {
+            File auditFile = new File(dataFolder, "audit.yml");
+            YamlBlueprintConfigFile config = new YamlBlueprintConfigFile(auditFile);
+            List<Map<String, Object>> logs = getLogs(config);
 
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("action",      action.name());
-        entry.put("world",       worldName);
-        entry.put("actor",       actorUuid != null ? actorUuid.toString() : null);
-        entry.put("detail",      detail);
-        entry.put("occurred_at", Instant.now().toEpochMilli());
-        logs.add(entry);
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("action",      action.name());
+            entry.put("world",       worldName);
+            entry.put("actor",       actorUuid != null ? actorUuid.toString() : null);
+            entry.put("detail",      detail);
+            entry.put("occurred_at", Instant.now().toEpochMilli());
+            logs.add(entry);
 
-        if (logs.size() > 1000) logs = logs.subList(logs.size() - 1000, logs.size());
-        config.set("logs", logs);
-        config.save();
+            if (logs.size() > 1000) logs = logs.subList(logs.size() - 1000, logs.size());
+            config.set("logs", logs);
+            config.save();
+        } catch (Exception e) {
+            logger.warning("[Blueprint] Failed to write audit log to " + dataFolder.getAbsolutePath()
+                    + "/audit.yml: " + e.getMessage());
+            throw new StorageException("Audit log write failed", e);
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

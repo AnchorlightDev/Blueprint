@@ -152,13 +152,14 @@ public class WorldService {
      * dimensions directory: blueprint/world/dimensions/minecraft/&lt;name&gt;/.
      */
     private @NotNull Path computeDimensionPath(@NotNull String folderName) {
-        World mainWorld = Bukkit.getWorld(config.getFallbackWorld());
-        if (mainWorld == null && !Bukkit.getWorlds().isEmpty()) mainWorld = Bukkit.getWorlds().get(0);
-        if (mainWorld != null) {
-            return mainWorld.getWorldFolder().toPath().toAbsolutePath().normalize()
-                    .resolve("dimensions/minecraft").resolve(folderName);
-        }
-        return Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize().resolve(folderName);
+        // Paper migrates blueprint worlds into the primary world's dimensions directory.
+        // Use the world container + main world name directly — NOT mainWorld.getWorldFolder(),
+        // which returns the overworld sub-folder (blueprint/world/dimensions/minecraft/overworld/)
+        // and would produce a doubled path like .../overworld/dimensions/minecraft/<name>.
+        return Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize()
+                .resolve(config.getFallbackWorld())
+                .resolve("dimensions/minecraft")
+                .resolve(folderName);
     }
 
     private boolean hasRegionData(@NotNull Path worldPath) {
@@ -443,6 +444,8 @@ public class WorldService {
         // Lock build worlds to permanent day
         world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setTime(6000); // noon
+        // Suppress advancement chat announcements in build worlds
+        world.setGameRule(org.bukkit.GameRule.ANNOUNCE_ADVANCEMENTS, false);
     }
 
     /**

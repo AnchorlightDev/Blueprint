@@ -5,7 +5,9 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * Safe file-system utilities for Blueprint operations.
@@ -23,6 +25,16 @@ public final class FileUtil {
      * @throws IOException              on any IO failure
      */
     public static void copyDirectory(@NotNull Path source, @NotNull Path target) throws IOException {
+        copyDirectory(source, target, Collections.emptyList());
+    }
+
+    /**
+     * Recursively copies {@code source} into {@code target}, excluding specific top-level entries.
+     *
+     * @param excludeNames names of files/folders in the source root to skip
+     * @throws IOException on any IO failure
+     */
+    public static void copyDirectory(@NotNull Path source, @NotNull Path target, @NotNull List<String> excludeNames) throws IOException {
         Path normSource = source.toAbsolutePath().normalize();
         Path normTarget = target.toAbsolutePath().normalize();
 
@@ -32,23 +44,38 @@ public final class FileUtil {
                              Files.isRegularFile(normSource) ? " (is a regular file)" : " (not a directory)";
             throw new IllegalArgumentException("Source is not a directory: " + normSource + details);
         }
-        if (Files.exists(normTarget)) {
-            throw new IllegalArgumentException("Target already exists: " + normTarget);
+        if (Files.exists(normTarget) && !Files.isDirectory(normTarget)) {
+            throw new IllegalArgumentException("Target already exists and is not a directory: " + normTarget);
         }
 
         Files.walkFileTree(normSource, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
                 new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                        Path dest = normTarget.resolve(normSource.relativize(dir));
+                        if (dir.equals(normSource)) {
+                            Files.createDirectories(normTarget);
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        Path relative = normSource.relativize(dir);
+                        if (relative.getNameCount() == 1 && excludeNames.contains(relative.getFileName().toString())) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+
+                        Path dest = normTarget.resolve(relative);
                         Files.createDirectories(dest);
                         return FileVisitResult.CONTINUE;
                     }
 
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        Path dest = normTarget.resolve(normSource.relativize(file));
-                        Files.copy(file, dest, StandardCopyOption.COPY_ATTRIBUTES);
+                        Path relative = normSource.relativize(file);
+                        if (relative.getNameCount() == 1 && excludeNames.contains(relative.getFileName().toString())) {
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        Path dest = normTarget.resolve(relative);
+                        Files.copy(file, dest, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
                         return FileVisitResult.CONTINUE;
                     }
                 });
@@ -61,12 +88,37 @@ public final class FileUtil {
      * @throws IOException on any IO failure
      */
     public static void deleteDirectory(@NotNull Path path) throws IOException {
+        deleteDirectory(path, Collections.emptyList());
+    }
+
+    /**
+     * Recursively deletes a directory, excluding specific top-level entries.
+     *
+     * @param excludeNames names of files/folders in the root to skip
+     * @throws IOException on any IO failure
+     */
+    public static void deleteDirectory(@NotNull Path path, @NotNull List<String> excludeNames) throws IOException {
         Path normPath = path.toAbsolutePath().normalize();
         if (!Files.exists(normPath)) return;
 
         Files.walkFileTree(normPath, new SimpleFileVisitor<>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                if (dir.equals(normPath)) return FileVisitResult.CONTINUE;
+
+                Path relative = normPath.relativize(dir);
+                if (relative.getNameCount() == 1 && excludeNames.contains(relative.getFileName().toString())) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path relative = normPath.relativize(file);
+                if (relative.getNameCount() == 1 && excludeNames.contains(relative.getFileName().toString())) {
+                    return FileVisitResult.CONTINUE;
+                }
                 Files.delete(file);
                 return FileVisitResult.CONTINUE;
             }
@@ -74,6 +126,12 @@ public final class FileUtil {
             @Override
             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
                 if (exc != null) throw exc;
+                if (dir.equals(normPath)) {
+                    if (excludeNames.isEmpty()) {
+                        Files.delete(dir);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
                 Files.delete(dir);
                 return FileVisitResult.CONTINUE;
             }

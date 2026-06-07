@@ -1,220 +1,241 @@
 # Blueprint Manual Test Checklist
 
-Use this checklist when testing Blueprint on a Paper server.
-All commands require OP or `blueprint.admin` unless otherwise noted.
+Use this on a Paper server with `settings.world-container: blueprint` set in `bukkit.yml`.
+All commands require OP or `blueprint.admin` unless noted.
 
 ---
 
-## Environment
+## Setup Check
 
-- [ ] Paper 1.21.x (primary target)
-- [ ] Paper latest (best-effort check)
-- [ ] Java 21+
-- [ ] At least one default world (`world`) loaded as fallback
-
----
-
-## 1. Plugin Load
-
-- [ ] Plugin enables without errors in console
-- [ ] `plugins/Blueprint/config.yml` is generated
-- [ ] `plugins/Blueprint/blueprint.db` is created
-- [ ] `plugins/Blueprint/snapshots/` directory exists
-- [ ] `/blueprint help` shows all commands
+- [ ] `bukkit.yml` has `settings: world-container: blueprint`
+- [ ] `blueprint/` folder exists in server root (contains `world/`, `world_nether/`, `world_the_end/`)
+- [ ] Plugin enables without errors
+- [ ] `plugins/Blueprint/config.yml` generated
+- [ ] `plugins/Blueprint/audit.yml` created after first command
+- [ ] `/bp help` shows all commands
 
 ---
 
-## 2. Create World
+## 1. Create World
 
 ```
-/blueprint create testworld
+/bp create testworld
 ```
-- [ ] Success message shown
-- [ ] `blueprint_testworld/` folder created in server root
-- [ ] `/blueprint list` shows `testworld` with status `OPEN` (if auto-open enabled)
-- [ ] Try duplicate: `/blueprint create testworld` → error "already exists"
-- [ ] Try invalid name: `/blueprint create TEST World!` → error "invalid name"
-- [ ] Try short name: `/blueprint create ab` → error "invalid name"
+- [ ] Success message
+- [ ] `blueprint/testworld/` folder created on disk
+- [ ] `blueprint/testworld/blueprint.yml` metadata file created
+- [ ] `/bp list` shows `testworld` as `OPEN` (with `auto-open-created-worlds: true`)
+- [ ] Spawn platform (3x3 glass) exists at 0,64,0
+- [ ] World is permanent day, no mob spawning
+
+Invalid cases:
+- [ ] `/bp create testworld` again → "already exists"
+- [ ] `/bp create Test World!` → "invalid name"
+- [ ] `/bp create ab` → "invalid name" (min 3 chars)
 
 ---
 
-## 3. List Worlds
+## 2. List
 
 ```
-/blueprint list
-/blueprint list 2
+/bp list
+/bp list 2
 ```
-- [ ] First page shows worlds
-- [ ] Page 2 of empty → "No worlds found on page 2"
-- [ ] Status colors: green=OPEN, gray=CLOSED, red=LOCKED
+- [ ] Shows worlds with status colors (green=OPEN, gray=CLOSED, red=LOCKED)
+- [ ] Empty page → "No worlds found on page 2"
 
 ---
 
-## 4. Teleport
+## 3. Teleport
 
 ```
-/blueprint tp testworld
+/bp tp testworld
 ```
-- [ ] Player teleported to spawn of `blueprint_testworld`
-- [ ] Closed world: `/blueprint tp testworld` → error "is closed"
-- [ ] Non-existent: `/blueprint tp doesnotexist` → error "not found"
-- [ ] Console: `/blueprint tp testworld` → error "players only"
+- [ ] Player teleports to spawn of `blueprint/testworld/`
+- [ ] `/bp tp closedworld` → "is closed"
+- [ ] `/bp tp doesnotexist` → "not found"
+
+---
+
+## 4. Hub
+
+```
+/bp hub
+```
+- [ ] Player teleports to hub world (configured as `hub-world` in config)
 
 ---
 
 ## 5. Close / Open
 
 ```
-/blueprint close testworld
+/bp close testworld
 ```
-- [ ] Players in world are teleported to fallback world
-- [ ] World is unloaded (not shown in `/list` as a Bukkit world)
-- [ ] Status shows `CLOSED`
+- [ ] Players in the world are moved to fallback world with message
+- [ ] World unloads from Bukkit
+- [ ] `/bp list` shows `CLOSED`
+- [ ] `/bp close testworld` again → "already closed"
 
 ```
-/blueprint open testworld
+/bp open testworld
 ```
 - [ ] World loads
-- [ ] Status shows `OPEN`
-- [ ] Closing an already-closed world → error "already closed"
-- [ ] Opening an already-open world → error "already open"
+- [ ] `/bp list` shows `OPEN`
+- [ ] `/bp open testworld` again → "already open"
 
 ---
 
 ## 6. Lock / Unlock
 
 ```
-/blueprint lock testworld
+/bp lock testworld
 ```
 - [ ] Status shows `LOCKED`
-- [ ] Player without bypass: break a block → denied with message
-- [ ] Player without bypass: place a block → denied
-- [ ] Player without bypass: attack entity → denied
-- [ ] Player with `blueprint.bypass.lock`: can break/place normally
+- [ ] Player without `blueprint.bypass.lock`: break a block → denied with message
+- [ ] Player without `blueprint.bypass.lock`: place a block → denied
+- [ ] Player with `blueprint.bypass.lock`: can edit freely
 
 ```
-/blueprint unlock testworld
+/bp unlock testworld
 ```
 - [ ] Status returns to `OPEN`
-- [ ] Blocks can be placed/broken again
+- [ ] Normal block editing works again
 
 ---
 
-## 7. Clone World
+## 7. Import
 
-```
-/blueprint clone testworld testclone
-```
-- [ ] Success message after async operation
-- [ ] `blueprint_testclone/` exists on disk
-- [ ] `blueprint_testclone/uid.dat` does NOT exist
-- [ ] `blueprint_testclone/session.lock` does NOT exist
-- [ ] `/blueprint list` shows `testclone` (OPEN if auto-open-clones=true)
-- [ ] Original world (`testworld`) is still accessible
-- [ ] Try cloning non-existent source → error "not found"
-- [ ] Try cloning to existing target → error "already exists"
-- [ ] Try invalid target name → error "invalid name"
+1. Create a folder `blueprint/importtest/` containing a valid world (copy `blueprint/testworld/` minus the `blueprint.yml`)
+2. Run `/bp import importtest`
+- [ ] Success message, world loads
+- [ ] `blueprint/importtest/` shows as `OPEN` in `/bp list`
+- [ ] World data loads correctly (not a blank void world)
+
+Invalid cases:
+- [ ] `/bp import nonexistent` → "No world data found ... blueprint/nonexistent"
+- [ ] `/bp import testworld` (already registered) → "already registered"
 
 ---
 
-## 8. Snapshot Create
+## 8. Clone
 
 ```
-/blueprint snapshot create testworld
+/bp clone testworld testclone
 ```
-- [ ] Success message with snapshot ID (e.g. `snap-2026-05-07-153022`)
-- [ ] Snapshot folder created: `plugins/Blueprint/snapshots/testworld/snap-2026-05-07-153022/`
-- [ ] World is re-opened after snapshot if it was open
-- [ ] Snapshots disabled: set `snapshots.enabled: false`, restart, try → error "disabled"
+- [ ] Success message after async copy
+- [ ] `blueprint/testclone/` exists on disk with region data
+- [ ] `blueprint/testclone/uid.dat` does NOT exist
+- [ ] `blueprint/testclone/session.lock` does NOT exist
+- [ ] `testclone` appears in `/bp list` (OPEN if `auto-open-clones: true`)
+- [ ] Original `testworld` is still accessible
+- [ ] `/bp clone missing target` → "source not found"
+- [ ] `/bp clone testworld testworld` (target exists) → "already exists"
 
 ---
 
-## 9. Snapshot List
+## 9. Rename
 
 ```
-/blueprint snapshot list testworld
+/bp rename testclone renamedworld
 ```
-- [ ] Lists all snapshots newest-first with IDs and timestamps
-- [ ] No snapshots → "No snapshots for world..."
-- [ ] Non-existent world → error "not found"
+- [ ] Success message
+- [ ] `blueprint/testclone/` renamed to `blueprint/renamedworld/` on disk
+- [ ] `/bp list` shows `renamedworld`, not `testclone`
+- [ ] `/bp tp renamedworld` works
+- [ ] Old name `testclone` no longer in list
+- [ ] `/bp rename renamedworld testworld` (name taken) → "already exists"
 
 ---
 
-## 10. Snapshot Restore
+## 10. Snapshot Create
 
 ```
-/blueprint snapshot restore testworld snap-<id>
+/bp snapshot create testworld
 ```
-- [ ] Pre-restore backup is created (check `plugins/Blueprint/snapshots/testworld/`)
-- [ ] World folder replaced with snapshot contents
+- [ ] Success with snapshot ID like `snap-2026-05-07-153022`
+- [ ] Snapshot folder: `blueprint/testworld/snapshots/snap-2026-05-07-153022/` exists
+- [ ] Snapshot folder contains region data (not empty)
+- [ ] World is still open / re-opened after snapshot
+- [ ] With `snapshots.enabled: false` → error "snapshots are disabled"
+
+---
+
+## 11. Snapshot List
+
+```
+/bp snapshot list testworld
+```
+- [ ] Lists snapshots newest-first with IDs and timestamps
+- [ ] No snapshots → "No snapshots found"
+- [ ] Unknown world → "not found"
+
+---
+
+## 12. Snapshot Restore
+
+Make a change to `testworld`, create a snapshot, make another change, then:
+
+```
+/bp snapshot restore testworld snap-<id>
+```
+- [ ] Pre-restore backup created: `blueprint/testworld/snapshots/pre-restore-.../` exists
+- [ ] World folder replaced with snapshot data
 - [ ] `uid.dat` removed from restored folder
-- [ ] World is re-loaded if it was open before restore
-- [ ] Non-existent snapshot ID → error "not found"
+- [ ] World reloads with the restored data
+- [ ] Invalid snapshot ID → "not found"
 
 ---
 
-## 11. Snapshot Delete
+## 13. Snapshot Delete
 
 ```
-/blueprint snapshot delete testworld snap-<id>
+/bp snapshot delete testworld snap-<id>
 ```
-- [ ] Snapshot folder deleted from disk
-- [ ] Snapshot removed from list
-- [ ] Non-existent ID → error "not found"
+- [ ] Snapshot folder removed from disk
+- [ ] No longer appears in `/bp snapshot list testworld`
+- [ ] Invalid ID → "not found"
 
 ---
 
-## 12. Delete World
+## 14. Delete World
 
 ```
-/blueprint delete testworld
+/bp delete renamedworld
 ```
 - [ ] With `require-delete-confirmation: true` → prompts to add "confirm"
 
 ```
-/blueprint delete testworld confirm
+/bp delete renamedworld confirm
 ```
-- [ ] Success message
-- [ ] World unloaded
-- [ ] `blueprint_testworld/` folder deleted from disk
-- [ ] `/blueprint list` no longer shows `testworld`
-- [ ] Concurrent delete blocked: try running two deletes rapidly → second should fail with "busy"
+- [ ] World unloaded, players moved to fallback
+- [ ] `blueprint/renamedworld/` deleted from disk
+- [ ] No longer in `/bp list`
 
 ---
 
-## 13. Restart Persistence
+## 15. Restart Persistence
 
-1. Create a world: `/blueprint create persist`
-2. Stop server
-3. Start server
-4. Run `/blueprint list` → `persist` still listed
-5. Run `/blueprint open persist` → world loads correctly
-6. Create a snapshot, restart, run `/blueprint snapshot list persist` → snapshot still listed
-
----
-
-## 14. Operation Lock Conflicts
-
-1. Start a clone: `/blueprint clone bigworld clone1`
-2. Immediately try to delete source: `/blueprint delete bigworld confirm`
-3. → Second operation should fail with "is currently busy"
+1. `/bp create persist` — note it as OPEN
+2. Stop server, start server
+3. `/bp list` → `persist` still listed and restored as OPEN (if `close-on-restart: false`)
+4. `/bp tp persist` → world loads and teleport works
+5. Create a snapshot, restart, `/bp snapshot list persist` → snapshot still listed
 
 ---
 
-## 15. Permission Tests
+## 16. Operation Lock (Concurrency)
 
-With a non-OP player who has no Blueprint permissions:
-- [ ] All commands return "no permission" message
-
-With a player who has `blueprint.bypass.lock`:
-- [ ] Can modify blocks in a LOCKED world
+1. Start a long clone on a large world
+2. Immediately try `/bp delete <sourceName> confirm`
+3. → Should fail with "is currently busy"
 
 ---
 
-## 16. Edge Cases
+## 17. Permissions
 
-- [ ] Teleport to a world that exists in DB but folder is missing → appropriate error in console
-- [ ] Create world name at min length (3 chars): `/blueprint create abc` → OK
-- [ ] Create world name at max length (32 chars): `/blueprint create aaaabbbbccccddddeeeeffffgggghhhh` → OK
-- [ ] Create world name 33 chars → error invalid name
-- [ ] `/blueprint snapshot restore testworld snap-id` when world is busy → error "busy"
+Non-OP player with no Blueprint nodes:
+- [ ] All `/bp` commands return "no permission"
+
+Player with only `blueprint.bypass.lock`:
+- [ ] Can edit blocks in a LOCKED world
+- [ ] Cannot run other `/bp` commands

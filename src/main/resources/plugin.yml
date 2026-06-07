@@ -23,6 +23,7 @@ permissions:
       blueprint.command.help: true
       blueprint.command.version: true
       blueprint.command.create: true
+      blueprint.command.import: true
       blueprint.command.list: true
       blueprint.command.teleport: true
       blueprint.command.hub: true
@@ -46,6 +47,10 @@ permissions:
 
   blueprint.command.create:
     description: Create a new build world
+    default: true
+
+  blueprint.command.import:
+    description: Import an existing world into Blueprint
     default: true
 
   blueprint.command.list:

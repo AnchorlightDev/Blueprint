@@ -74,24 +74,16 @@ public class SessionListener implements Listener {
 
     /**
      * Returns true if the given Bukkit world is managed by Blueprint.
-     * Uses the configured folder-prefix as a fast check, then confirms via DB.
+     * World names are plain strings with no fixed prefix, so confirmation via DB is required.
      */
     private boolean isBlueprintWorld(@NotNull World world) {
         String folderName = world.getName();
-
-        // Fast path: Blueprint worlds always use the configured prefix
-        if (!folderName.startsWith(config.getWorldFolderPrefix())) return false;
-
-        // Confirm via DB to avoid false-positives from non-Blueprint worlds
-        // that happen to share the prefix (rare, but correct to check)
         try {
             for (WorldMetadata meta : storage.listAllWorlds()) {
                 if (meta.getFolderName().equals(folderName)) return true;
             }
         } catch (StorageException e) {
             logger.warning("[Blueprint] SessionListener DB error: " + e.getMessage());
-            // Fall back to prefix-only check if DB is unavailable
-            return true;
         }
         return false;
     }

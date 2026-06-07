@@ -5,6 +5,7 @@ package dev.anchorlight.blueprint.model;
  */
 public enum AuditAction {
     CREATE_WORLD,
+    IMPORT_WORLD,
     OPEN_WORLD,
     CLOSE_WORLD,
     LOCK_WORLD,

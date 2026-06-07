@@ -14,7 +14,7 @@ public class WorldMetadata {
     /** Logical display name used in commands (e.g. "myworld"). */
     private final String name;
 
-    /** Actual Bukkit folder name (e.g. "blueprint_myworld"). */
+    /** Bukkit WorldCreator name (e.g. "blueprint/myworld"), triggers Paper dimension routing. */
     private final String folderName;
 
     /** UUID of the player who created this world; null for console-created worlds. */

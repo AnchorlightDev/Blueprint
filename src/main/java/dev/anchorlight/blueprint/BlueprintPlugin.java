@@ -27,7 +27,8 @@ import java.util.concurrent.TimeUnit;
  * <p>Bootstrap order:
  * <ol>
  *   <li>Save default config</li>
- *   <li>Initialize storage (SQLite + HikariCP)</li>
+ *   <li>Initialize storage</li>
+ *   <li>Redirect world container to blueprint/ subfolder (via reflection)</li>
  *   <li>Initialize services</li>
  *   <li>Register commands</li>
  *   <li>Register listeners</li>
@@ -44,6 +45,7 @@ public class BlueprintPlugin extends JavaPlugin {
 
     /** Single-threaded executor for all async file I/O. */
     private ExecutorService ioExecutor;
+
 
     @Override
     public void onEnable() {
@@ -65,13 +67,31 @@ public class BlueprintPlugin extends JavaPlugin {
         }
 
         // ── 3. Storage ────────────────────────────────────────────────────
-        storage = new YamlBlueprintStorage(getDataFolder(), getLogger(), blueprintConfig.getContainerDirectory());
+        storage = new YamlBlueprintStorage(getDataFolder(), getLogger());
         try {
             storage.initializeSchema();
         } catch (StorageException e) {
             getLogger().severe("Failed to initialize storage: " + e.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
+        }
+
+        // ── 3b. Verify world-container ────────────────────────────────────
+        // Blueprint requires bukkit.yml  →  settings:  world-container: blueprint
+        // so that Bukkit.getWorldContainer() returns the blueprint/ sub-folder and
+        // WorldCreator("myworld") creates worlds at blueprint/myworld/ directly.
+        // Without this, worlds land in the server root under arbitrary names.
+        String expectedContainer = blueprintConfig.getContainerDirectory();
+        File   worldContainer    = getServer().getWorldContainer();
+        if (!worldContainer.getName().equals(expectedContainer)) {
+            getLogger().warning("[Blueprint] *** SETUP REQUIRED ***");
+            getLogger().warning("[Blueprint] Blueprint worlds should live at ./" + expectedContainer + "/<name>/");
+            getLogger().warning("[Blueprint] Add the following to bukkit.yml and restart:");
+            getLogger().warning("[Blueprint]   settings:");
+            getLogger().warning("[Blueprint]     world-container: " + expectedContainer);
+            getLogger().warning("[Blueprint] Without this, worlds may be placed in an unexpected location.");
+        } else {
+            getLogger().info("[Blueprint] World container: " + worldContainer.getAbsolutePath());
         }
 
         // ── 4. Services ───────────────────────────────────────────────────
@@ -90,6 +110,7 @@ public class BlueprintPlugin extends JavaPlugin {
         dispatcher.register(new HelpCommand(dispatcher, blueprintConfig));
         dispatcher.register(new VersionCommand(this, blueprintConfig));
         dispatcher.register(new CreateCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new ImportCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new ListCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new TpCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new HubCommand(blueprintConfig));
@@ -118,9 +139,6 @@ public class BlueprintPlugin extends JavaPlugin {
                 new SessionListener(this, storage, blueprintConfig, getLogger()), this);
 
         // ── 7. Restore world state from previous session ──────────────────
-        // Worlds marked OPEN/LOCKED in the DB are not auto-loaded by Bukkit on
-        // restart (they are not in server.properties). Re-load them now so that
-        // the in-memory state matches what the DB says.
         try {
             worldService.restoreOpenWorlds();
         } catch (StorageException e) {
@@ -133,7 +151,6 @@ public class BlueprintPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Shut down IO executor gracefully
         if (ioExecutor != null && !ioExecutor.isShutdown()) {
             ioExecutor.shutdown();
             try {
@@ -147,7 +164,6 @@ public class BlueprintPlugin extends JavaPlugin {
             }
         }
 
-        // Close database connections
         if (storage != null) {
             storage.close();
         }
@@ -155,7 +171,7 @@ public class BlueprintPlugin extends JavaPlugin {
         getLogger().info("Blueprint disabled.");
     }
 
-    // ── Accessors for services ─────────────────────────────────────────────
+    // ── Accessors ──────────────────────────────────────────────────────────
 
     public BlueprintConfig getBlueprintConfig() { return blueprintConfig; }
     public BlueprintStorage getStorage() { return storage; }
@@ -163,7 +179,14 @@ public class BlueprintPlugin extends JavaPlugin {
     public CloneService getCloneService() { return cloneService; }
     public SnapshotService getSnapshotService() { return snapshotService; }
     public OperationLockService getOpLocks() { return opLocks; }
-
-    /** The shared IO executor for all async file operations. */
     public ExecutorService getIoExecutor() { return ioExecutor; }
+
+    /**
+     * Returns the Bukkit folder name for a Blueprint world.
+     * With {@code settings.world-container: blueprint} in bukkit.yml, this is
+     * the plain world name — Bukkit maps it to {@code blueprint/<name>/} on disk.
+     */
+    public String worldFolderName(String name) {
+        return name;
+    }
 }

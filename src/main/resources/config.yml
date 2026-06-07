@@ -6,11 +6,11 @@ storage:
   type: yaml
 
 worlds:
-  # Directory where managed worlds are stored (relative to server root)
+  # The sub-folder that holds all Blueprint worlds.  MUST match bukkit.yml:
+  #   settings:
+  #     world-container: blueprint
+  # Worlds are then stored at: <serverRoot>/blueprint/<name>/
   container-directory: "blueprint"
-  # Prefix applied to Bukkit world folder names (e.g. blueprint_myworld)
-  # This is legacy and mostly ignored now that container-directory is used
-  folder-prefix: "blueprint_"
   # Number of worlds shown per /blueprint list page
   page-size: 10
   # World to send players to when a world is unloaded/closed

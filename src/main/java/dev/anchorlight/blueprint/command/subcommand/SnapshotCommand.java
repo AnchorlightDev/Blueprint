@@ -41,7 +41,7 @@ public class SnapshotCommand implements SubCommand {
     }
 
     @Override public @NotNull String getName() { return "snapshot"; }
-    @Override public @NotNull String getUsage() { return "snapshot <create|list|restore|delete> <world> [snapshotId]"; }
+    @Override public @NotNull String getUsage() { return "snapshot <create|list|restore|delete> [world]"; }
     @Override public @NotNull String getDescription() { return "Manage world snapshots"; }
     @Override public @NotNull String getPermission() { return "blueprint.command.snapshot"; }
 
@@ -51,17 +51,34 @@ public class SnapshotCommand implements SubCommand {
             Messages.send(sender, config, Messages.ERROR_NO_PERMISSION);
             return;
         }
-        if (args.length < 2) {
+        if (args.length < 1) {
             Messages.send(sender, config, "<red>Usage: <yellow>/blueprint " + getUsage());
             return;
         }
 
-        String action    = args[0].toLowerCase();
-        String worldName = args[1].toLowerCase();
-        UUID actor       = sender instanceof Player p ? p.getUniqueId() : null;
+        String action = args[0].toLowerCase();
+        UUID actor    = sender instanceof Player p ? p.getUniqueId() : null;
+
+        // For create/list the world name is optional — defaults to the player's current world.
+        // For restore/delete it is always required because a snapshot ID is also needed.
+        String worldName;
+        if (args.length >= 2) {
+            worldName = args[1].toLowerCase();
+        } else if ((action.equals("create") || action.equals("list")) && sender instanceof Player p) {
+            worldName = p.getWorld().getName();
+        } else {
+            Messages.send(sender, config, "<red>Usage: <yellow>/blueprint snapshot " + action + " <world>");
+            return;
+        }
 
         switch (action) {
-            case "create"  -> doCreate(sender, worldName, actor);
+            case "create" -> {
+                if (args.length > 2) {
+                    Messages.send(sender, config, "<red>Usage: <yellow>/blueprint snapshot create [world]");
+                    return;
+                }
+                doCreate(sender, worldName, actor);
+            }
             case "list"    -> doList(sender, worldName);
             case "restore" -> {
                 if (args.length < 3) {
@@ -154,6 +171,18 @@ public class SnapshotCommand implements SubCommand {
         if (args.length == 2) {
             try { return worldService.worldNames(); }
             catch (StorageException e) { return List.of(); }
+        }
+        if (args.length == 3) {
+            String action = args[0].toLowerCase();
+            if (action.equals("restore") || action.equals("delete")) {
+                try {
+                    return snapshotService.listSnapshots(args[1]).stream()
+                            .map(SnapshotMetadata::getSnapshotId)
+                            .toList();
+                } catch (StorageException | IllegalArgumentException e) {
+                    return List.of();
+                }
+            }
         }
         return List.of();
     }

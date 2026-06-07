@@ -368,6 +368,19 @@ public class WorldService {
         return meta;
     }
 
+    /**
+     * Computes the on-disk path a not-yet-created world will occupy once Paper loads it.
+     * Mirrors {@link #resolveWorldPath} for the closed-world case: Paper migrates managed
+     * worlds into the primary world's dimension directory
+     * ({@code <container>/<fallbackWorld>/dimensions/minecraft/<folder>/}).
+     *
+     * <p>Used by cloning so the copy target matches the folder Paper will later load from,
+     * without having to create-and-discard a throwaway world to probe the path.</p>
+     */
+    public @NotNull Path resolveNewWorldPath(@NotNull String folderName) {
+        return computeDimensionPath(folderName);
+    }
+
     public @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {
         World world = Bukkit.getWorld(meta.getFolderName());
         if (world != null) {

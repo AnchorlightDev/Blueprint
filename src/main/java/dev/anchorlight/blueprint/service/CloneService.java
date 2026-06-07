@@ -8,14 +8,10 @@ import dev.anchorlight.blueprint.model.AuditAction;
 import dev.anchorlight.blueprint.model.WorldMetadata;
 import dev.anchorlight.blueprint.model.WorldStatus;
 import dev.anchorlight.blueprint.util.FileUtil;
-import dev.anchorlight.blueprint.util.VoidGenerator;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.WorldCreator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -109,11 +105,14 @@ public class CloneService {
                     // Capture the authoritative source folder BEFORE unloading.
                     Path sourceActualPath = worldService.resolveWorldPath(sourceMeta);
 
-                    // Probe the target world to discover where Paper will actually store
-                    // it. WorldCreator("blueprint/<name>") maps to a Paper dimension path
-                    // (e.g. world/dimensions/minecraft/blueprint/<name>/) that differs from
-                    // the computed Bukkit.getWorldContainer()+"/blueprint/<name>" path.
-                    Path targetActualPath = probeTargetPath(targetName);
+                    // Resolve where Paper will store the new world deterministically.
+                    // Paper migrates managed worlds into the primary world's dimension
+                    // directory (world/dimensions/minecraft/<name>/). We must NOT probe this
+                    // by creating-and-unloading a throwaway world at the target name: doing so
+                    // leaves Paper's in-memory world/UID registry dirty, which later makes Paper
+                    // refuse the clone with "is a duplicate of another world ... prevented from
+                    // loading". resolveNewWorldPath computes the same path the loader uses.
+                    Path targetActualPath = worldService.resolveNewWorldPath(targetName);
 
                     if (sourceWasOpen) {
                         worldService.unloadBukkitWorld(sourceMeta);
@@ -141,30 +140,6 @@ public class CloneService {
         }
 
         return future;
-    }
-
-    /**
-     * Discovers the actual on-disk path Paper will use for a new target world by
-     * briefly creating and immediately unloading it (save=false so no chunk data
-     * is written). Paper may route "blueprint/&lt;name&gt;" through its dimension
-     * storage rather than the world container root.
-     *
-     * <strong>Must be called on the main thread.</strong>
-     */
-    private @NotNull Path probeTargetPath(@NotNull String targetName) {
-        String targetFolder = targetName;
-        WorldCreator creator = new WorldCreator(targetFolder)
-                .generator(new VoidGenerator())
-                .generateStructures(false);
-        World world = creator.createWorld();
-        if (world == null) {
-            logger.warning("[Blueprint] probeTargetPath: WorldCreator returned null for '" + targetName + "'; falling back to computed path");
-            return new File(Bukkit.getWorldContainer(), targetFolder).toPath().toAbsolutePath().normalize();
-        }
-        Path actualPath = world.getWorldFolder().toPath().toAbsolutePath().normalize();
-        Bukkit.unloadWorld(world, false); // discard empty world — copy will overwrite its files
-        logger.info("[Blueprint] Clone target actual path: " + actualPath);
-        return actualPath;
     }
 
     private void performCopy(

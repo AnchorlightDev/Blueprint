@@ -31,11 +31,13 @@ permissions:
       blueprint.command.close: true
       blueprint.command.lock: true
       blueprint.command.unlock: true
+      blueprint.command.access: true
       blueprint.command.clone: true
       blueprint.command.snapshot: true
       blueprint.command.rename: true
       blueprint.command.delete: true
       blueprint.bypass.lock: true
+      blueprint.access.restricted: true
 
   blueprint.command.help:
     description: View Blueprint help
@@ -81,6 +83,10 @@ permissions:
     description: Unlock a build world
     default: true
 
+  blueprint.command.access:
+    description: View or set who can enter a world
+    default: op
+
   blueprint.command.clone:
     description: Clone a world
     default: true
@@ -99,4 +105,8 @@ permissions:
 
   blueprint.bypass.lock:
     description: Bypass locked-world protections
+    default: op
+
+  blueprint.access.restricted:
+    description: Enter worlds flagged as restricted (build-team only)
     default: op

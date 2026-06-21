@@ -64,9 +64,13 @@ public class ListCommand implements SubCommand {
                     case LOCKED   -> "<green>OPEN <red>[LOCKED]";
                     case ARCHIVED -> "<dark_gray>ARCHIVED";
                 };
+                String accessTag = meta.isRestricted()
+                        ? " <dark_gray>| <light_purple>[RESTRICTED]"
+                        : "";
                 sender.sendMessage(MM.deserialize(
                         "  <yellow>" + meta.getName()
                         + " <dark_gray>| " + statusTag
+                        + accessTag
                         + " <dark_gray>| <white>" + meta.getFolderName()));
             }
         } catch (StorageException e) {

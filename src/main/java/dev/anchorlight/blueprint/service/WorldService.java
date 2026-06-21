@@ -37,6 +37,12 @@ import java.util.logging.Logger;
  */
 public class WorldService {
 
+    /**
+     * Permission node required to enter a world flagged as {@code restricted}.
+     * Grant this to build-team ranks; community worlds need no permission.
+     */
+    public static final String ACCESS_RESTRICTED_PERM = "blueprint.access.restricted";
+
     private final BlueprintPlugin plugin;
     private final BlueprintStorage storage;
     private final BlueprintConfig config;
@@ -269,6 +275,10 @@ public class WorldService {
             throw new IllegalStateException("World '" + name + "' is closed and must be opened before teleporting.");
         }
 
+        if (!canEnter(player, meta)) {
+            throw new IllegalStateException("World '" + name + "' is restricted to the build team.");
+        }
+
         World world = Bukkit.getWorld(meta.getFolderName());
         if (world == null) {
             // DB says OPEN/LOCKED but Bukkit doesn't have it — recover by loading it now.
@@ -379,6 +389,35 @@ public class WorldService {
      */
     public @NotNull Path resolveNewWorldPath(@NotNull String folderName) {
         return computeDimensionPath(folderName);
+    }
+
+    /**
+     * Returns {@code true} if {@code player} may enter {@code meta}.
+     * Community worlds are open to everyone; restricted worlds require the
+     * {@link #ACCESS_RESTRICTED_PERM} node (which {@code blueprint.admin} grants).
+     */
+    public boolean canEnter(@NotNull Player player, @NotNull WorldMetadata meta) {
+        return !meta.isRestricted() || player.hasPermission(ACCESS_RESTRICTED_PERM);
+    }
+
+    /**
+     * Flags a world as build-team-only ({@code restricted=true}) or community
+     * ({@code restricted=false}) and persists the change.
+     *
+     * @return the updated metadata
+     */
+    public WorldMetadata setRestricted(@NotNull String name, boolean restricted, @Nullable UUID actor)
+            throws StorageException {
+        WorldMetadata meta = requireWorld(name);
+        if (meta.isRestricted() == restricted) {
+            throw new IllegalStateException("World '" + name + "' is already "
+                    + (restricted ? "restricted to the build team." : "open to the community."));
+        }
+        meta.setRestricted(restricted);
+        storage.saveWorld(meta);
+        storage.logAudit(AuditAction.SET_ACCESS, name, actor,
+                restricted ? "access=restricted" : "access=community");
+        return meta;
     }
 
     public @NotNull Path resolveWorldPath(@NotNull WorldMetadata meta) {

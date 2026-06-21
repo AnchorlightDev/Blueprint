@@ -27,6 +27,13 @@ public class WorldMetadata {
     @Nullable private Instant lastOpenedAt;
     @Nullable private Instant lastClosedAt;
 
+    /**
+     * When {@code true}, only players with the access permission
+     * ({@code blueprint.access.restricted}) may teleport into this world.
+     * Community worlds ({@code false}) are open to everyone.
+     */
+    private boolean restricted;
+
     public WorldMetadata(
             @NotNull String name,
             @NotNull String folderName,
@@ -36,6 +43,19 @@ public class WorldMetadata {
             @NotNull Instant updatedAt,
             @Nullable Instant lastOpenedAt,
             @Nullable Instant lastClosedAt) {
+        this(name, folderName, ownerUuid, status, createdAt, updatedAt, lastOpenedAt, lastClosedAt, false);
+    }
+
+    public WorldMetadata(
+            @NotNull String name,
+            @NotNull String folderName,
+            @Nullable UUID ownerUuid,
+            @NotNull WorldStatus status,
+            @NotNull Instant createdAt,
+            @NotNull Instant updatedAt,
+            @Nullable Instant lastOpenedAt,
+            @Nullable Instant lastClosedAt,
+            boolean restricted) {
         this.name = name;
         this.folderName = folderName;
         this.ownerUuid = ownerUuid;
@@ -44,6 +64,7 @@ public class WorldMetadata {
         this.updatedAt = updatedAt;
         this.lastOpenedAt = lastOpenedAt;
         this.lastClosedAt = lastClosedAt;
+        this.restricted = restricted;
     }
 
     // -- Getters --
@@ -56,11 +77,17 @@ public class WorldMetadata {
     public @NotNull Instant getUpdatedAt() { return updatedAt; }
     public @Nullable Instant getLastOpenedAt() { return lastOpenedAt; }
     public @Nullable Instant getLastClosedAt() { return lastClosedAt; }
+    public boolean isRestricted() { return restricted; }
 
     // -- Setters for mutable fields --
 
     public void setStatus(@NotNull WorldStatus status) {
         this.status = status;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setRestricted(boolean restricted) {
+        this.restricted = restricted;
         this.updatedAt = Instant.now();
     }
 

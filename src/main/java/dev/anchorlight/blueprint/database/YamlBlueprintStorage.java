@@ -67,6 +67,7 @@ public class YamlBlueprintStorage implements BlueprintStorage {
         config.set("updated_at",     meta.getUpdatedAt().toEpochMilli());
         config.set("last_opened_at", meta.getLastOpenedAt() != null ? meta.getLastOpenedAt().toEpochMilli() : null);
         config.set("last_closed_at", meta.getLastClosedAt() != null ? meta.getLastClosedAt().toEpochMilli() : null);
+        config.set("restricted",     meta.isRestricted());
         config.set("snapshots",      snapshots);
         config.save();
     }
@@ -145,7 +146,7 @@ public class YamlBlueprintStorage implements BlueprintStorage {
         WorldMetadata newMeta = new WorldMetadata(
                 newName, newFolderName, old.getOwnerUuid(),
                 old.getStatus(), old.getCreatedAt(), Instant.now(),
-                old.getLastOpenedAt(), old.getLastClosedAt());
+                old.getLastOpenedAt(), old.getLastClosedAt(), old.isRestricted());
         saveWorld(newMeta);
 
         // Copy snapshot records to the new world file
@@ -301,13 +302,15 @@ public class YamlBlueprintStorage implements BlueprintStorage {
         Instant lastClosed = config.contains("last_closed_at") && config.get("last_closed_at") != null
                 ? Instant.ofEpochMilli(config.getLong("last_closed_at")) : null;
 
+        boolean restricted = config.getBoolean("restricted", false);
+
         return new WorldMetadata(
                 name, folderName,
                 ownerStr != null && !ownerStr.isEmpty() ? UUID.fromString(ownerStr) : null,
                 WorldStatus.valueOf(statusStr),
                 Instant.ofEpochMilli(createdAt),
                 Instant.ofEpochMilli(updatedAt),
-                lastOpened, lastClosed);
+                lastOpened, lastClosed, restricted);
     }
 
     private SnapshotMetadata mapSnapshot(Map<String, Object> data, String worldName) {

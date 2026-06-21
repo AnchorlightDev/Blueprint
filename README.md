@@ -57,6 +57,7 @@ Use `/blueprint` or the shorthand `/bp`.
 | `/bp close <world>` | Unload a world (players evacuated safely) |
 | `/bp lock <world>` | Lock a world — no edits allowed |
 | `/bp unlock <world>` | Unlock a world |
+| `/bp access <world> [community\|restricted]` | View or set who can enter a world |
 | `/bp clone <source> <target>` | Duplicate a world, terrain and all |
 | `/bp rename <world> <new-name>` | Rename a world |
 | `/bp snapshot create <world>` | Capture a restore point |
@@ -69,9 +70,28 @@ Use `/blueprint` or the shorthand `/bp`.
 
 ---
 
+## Community vs. build-team worlds
+
+Keep your public lobbies open while walling off works-in-progress. Every world is either **community** (anyone can enter) or **restricted** (build team only):
+
+```
+/bp access spawn community      # open to everyone
+/bp access project-x restricted # build team only
+/bp access project-x            # check current access
+```
+
+Restricted worlds require the `blueprint.access.restricted` permission to teleport into — grant it to your build-team rank in LuckPerms (or any permissions plugin) and you're done. Players without it are politely turned away at `/bp tp`, and restricted worlds are flagged `[RESTRICTED]` in `/bp list`. Cloning a restricted world keeps it restricted, so a build-team build can't leak out by accident.
+
 ## Permissions
 
-Grant `blueprint.admin` for full access. Every command also has its own node (`blueprint.command.<name>`) for fine-grained control. All default to enabled, except `blueprint.bypass.lock`, which is op-only.
+Grant `blueprint.admin` for full access. Every command also has its own node (`blueprint.command.<name>`) for fine-grained control. Most default to enabled; the access controls are op-only by default:
+
+| Permission | Default | Grants |
+|------------|---------|--------|
+| `blueprint.admin` | op | Everything below |
+| `blueprint.command.access` | op | Changing a world's community/restricted setting |
+| `blueprint.access.restricted` | op | Entering restricted (build-team) worlds |
+| `blueprint.bypass.lock` | op | Building in locked worlds |
 
 ---
 

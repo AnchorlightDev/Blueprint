@@ -117,6 +117,7 @@ public class BlueprintPlugin extends JavaPlugin {
         dispatcher.register(new OpenCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new CloseCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new LockCommand(worldService, blueprintConfig, getLogger()));
+        dispatcher.register(new AccessCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new UnlockCommand(worldService, blueprintConfig, getLogger()));
         dispatcher.register(new CloneCommand(cloneService, worldService, blueprintConfig, getLogger()));
         dispatcher.register(new SnapshotCommand(snapshotService, worldService, blueprintConfig, getLogger()));

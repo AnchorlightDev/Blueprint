@@ -12,6 +12,7 @@ public enum AuditAction {
     UNLOCK_WORLD,
     CLONE_WORLD,
     RENAME_WORLD,
+    SET_ACCESS,
     CREATE_SNAPSHOT,
     RESTORE_SNAPSHOT,
     DELETE_SNAPSHOT,

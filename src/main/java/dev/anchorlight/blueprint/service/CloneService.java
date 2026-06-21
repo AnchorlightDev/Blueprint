@@ -170,9 +170,11 @@ public class CloneService {
 
         // Persist clone metadata
         Instant now = Instant.now();
+        // Clones inherit the source world's access restriction so a build-team
+        // world can't be exposed by simply cloning it.
         WorldMetadata cloneMeta = new WorldMetadata(
                 targetName, targetFolder, actor,
-                WorldStatus.CLOSED, now, now, null, null);
+                WorldStatus.CLOSED, now, now, null, null, sourceMeta.isRestricted());
         storage.saveWorld(cloneMeta);
         storage.logAudit(AuditAction.CLONE_WORLD, targetName, actor,
                 "source=" + sourceMeta.getName());

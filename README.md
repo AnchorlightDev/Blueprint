@@ -36,7 +36,7 @@ settings:
 
 **2. Move your existing worlds in.** Place your `world/`, `world_nether/`, and `world_the_end/` folders inside a new `blueprint/` folder, then restart. Your worlds now live at `/server/blueprint/<name>/`.
 
-**3. Drop in the plugin.** Copy `Blueprint-0.1.0.jar` into `plugins/` and restart.
+**3. Drop in the plugin.** Copy `Blueprint-0.2.0.jar` into `plugins/` and restart.
 
 That's it — you're ready to build.
 

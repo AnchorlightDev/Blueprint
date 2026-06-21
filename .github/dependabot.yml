@@ -1,0 +1,40 @@
+# Dependabot configuration for Blueprint
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # Maven dependencies (pom.xml) — Paper API, build plugins, etc.
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Bundle low-risk patch/minor bumps into a single PR to cut noise.
+      maven-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Paper API tracks the Minecraft version; bump it deliberately, not via bot.
+      - dependency-name: "io.papermc.paper:paper-api"
+
+  # GitHub Actions used by any workflows under .github/workflows/
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"

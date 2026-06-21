@@ -1,0 +1,42 @@
+# Blueprint Configuration
+# https://github.com/anchorlightdev/blueprint
+
+storage:
+  # Supported types: "yaml"
+  type: yaml
+
+worlds:
+  # The sub-folder that holds all Blueprint worlds.  MUST match bukkit.yml:
+  #   settings:
+  #     world-container: blueprint
+  # Worlds are then stored at: <serverRoot>/blueprint/<name>/
+  container-directory: "blueprint"
+  # Number of worlds shown per /blueprint list page
+  page-size: 10
+  # World to send players to when a world is unloaded/closed
+  fallback-world: "world"
+  # World players are sent to with /blueprint hub (defaults to fallback-world)
+  hub-world: "world"
+  # Automatically load (open) worlds immediately after creation
+  auto-open-created-worlds: true
+  # Automatically load (open) clone targets after cloning completes
+  auto-open-clones: true
+  # If true, worlds that were OPEN or LOCKED before a restart are marked CLOSED on startup
+  # instead of being automatically reloaded. Players must /bp open or /bp tp to re-enter them.
+  close-on-restart: false
+
+snapshots:
+  enabled: true
+  # Create an automatic backup snapshot before restoring
+  auto-backup-before-restore: true
+  # Maximum snapshots stored per world (oldest is pruned first, 0 = unlimited)
+  max-per-world: 25
+
+safety:
+  # Require the "confirm" keyword for /blueprint delete
+  require-delete-confirmation: true
+  # Regex that world names must match
+  allowed-world-name-regex: "^[a-z0-9_-]{3,32}$"
+
+messages:
+  prefix: "<gradient:#00aaff:#0066ff><bold>Blueprint</bold></gradient> <dark_gray>»</dark_gray> "

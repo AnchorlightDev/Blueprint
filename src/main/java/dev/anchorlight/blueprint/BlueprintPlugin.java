@@ -9,6 +9,7 @@ import dev.anchorlight.blueprint.database.StorageException;
 import dev.anchorlight.blueprint.listener.PortalListener;
 import dev.anchorlight.blueprint.listener.ProtectionListener;
 import dev.anchorlight.blueprint.listener.SessionListener;
+import dev.anchorlight.blueprint.listener.VoidTeleportListener;
 import dev.anchorlight.blueprint.service.CloneService;
 import dev.anchorlight.blueprint.service.OperationLockService;
 import dev.anchorlight.blueprint.service.SnapshotService;
@@ -144,6 +145,8 @@ public class BlueprintPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PortalListener(), this);
         getServer().getPluginManager().registerEvents(
                 new SessionListener(this, storage, blueprintConfig, getLogger()), this);
+        getServer().getPluginManager().registerEvents(
+                new VoidTeleportListener(storage, blueprintConfig, getLogger()), this);
 
         // ── 7. Restore world state from previous session ──────────────────
         try {

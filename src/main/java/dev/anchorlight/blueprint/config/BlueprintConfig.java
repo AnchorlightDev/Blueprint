@@ -20,6 +20,9 @@ public class BlueprintConfig {
     private final boolean autoOpenClones;
     private final boolean closeOnRestart;
 
+    private final boolean voidTeleportEnabled;
+    private final double voidTeleportMinY;
+
     private final boolean snapshotsEnabled;
     private final boolean autoBackupBeforeRestore;
     private final int maxSnapshotsPerWorld;
@@ -38,6 +41,9 @@ public class BlueprintConfig {
         autoOpenCreatedWorlds = cfg.getBoolean("worlds.auto-open-created-worlds", true);
         autoOpenClones        = cfg.getBoolean("worlds.auto-open-clones", true);
         closeOnRestart        = cfg.getBoolean("worlds.close-on-restart", false);
+
+        voidTeleportEnabled   = cfg.getBoolean("worlds.void-teleport.enabled", true);
+        voidTeleportMinY      = cfg.getDouble("worlds.void-teleport.min-y", -10.0);
 
         snapshotsEnabled           = cfg.getBoolean("snapshots.enabled", true);
         autoBackupBeforeRestore    = cfg.getBoolean("snapshots.auto-backup-before-restore", true);
@@ -59,6 +65,9 @@ public class BlueprintConfig {
     public boolean isAutoOpenCreatedWorlds() { return autoOpenCreatedWorlds; }
     public boolean isAutoOpenClones() { return autoOpenClones; }
     public boolean isCloseOnRestart() { return closeOnRestart; }
+
+    public boolean isVoidTeleportEnabled() { return voidTeleportEnabled; }
+    public double getVoidTeleportMinY() { return voidTeleportMinY; }
 
     public boolean isSnapshotsEnabled() { return snapshotsEnabled; }
     public boolean isAutoBackupBeforeRestore() { return autoBackupBeforeRestore; }

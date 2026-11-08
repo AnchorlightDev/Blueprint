@@ -24,6 +24,12 @@ worlds:
   # If true, worlds that were OPEN or LOCKED before a restart are marked CLOSED on startup
   # instead of being automatically reloaded. Players must /bp open or /bp tp to re-enter them.
   close-on-restart: false
+  # Void protection for Blueprint worlds (which use a void generator): if a player falls
+  # below min-y, teleport them back to that world's spawn. Only affects Blueprint-managed
+  # worlds, never the main/overworld, so normal deep caves are unaffected.
+  void-teleport:
+    enabled: true
+    min-y: -10
 
 snapshots:
   enabled: true

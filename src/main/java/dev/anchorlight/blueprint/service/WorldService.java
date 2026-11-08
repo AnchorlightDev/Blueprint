@@ -505,9 +505,11 @@ public class WorldService {
         }
 
         // Explicitly save all chunks before unloading so file operations see a fully
-        // flushed state — Paper's async save may not complete before unloadWorld returns.
+        // flushed state. world.save() can schedule an async flush that may not complete
+        // before unloadWorld returns, so we also pass save=true to unloadWorld to force a
+        // synchronous save as part of the unload. Passing false here was dropping world data.
         world.save();
-        if (!Bukkit.unloadWorld(world, false)) {
+        if (!Bukkit.unloadWorld(world, true)) {
             throw new IllegalStateException("Failed to unload world '" + meta.getName() + "' — cannot proceed with file operations.");
         }
     }

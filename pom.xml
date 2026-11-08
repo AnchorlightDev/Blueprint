@@ -16,7 +16,15 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
+        <!--
+          Paper 26.2. paper-api versions carry a -stable qualifier, so a Maven range like
+          [26.2.build,) resolves to nothing: the exact build is pinned here.
+          paper-api 26.2 ships Java 25 class files, so building requires JDK 25 (set JAVA_HOME
+          to a JDK 25). The compiled output still targets Java 21 (see <release> below), so the
+          plugin runs on Java 21+ servers.
+        -->
+        <paper.version>26.2.build.135-stable</paper.version>
+        <stonelib.version>v2.3.2</stonelib.version>
         <shade.plugin.version>3.6.2</shade.plugin.version>
         <compiler.plugin.version>3.16.0</compiler.plugin.version>
     </properties>
@@ -25,6 +33,10 @@
         <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 
@@ -45,6 +57,17 @@
             <artifactId>slf4j-api</artifactId>
             <version>2.0.20</version>
             <scope>provided</scope>
+        </dependency>
+
+        <!--
+          StoneLib: Anchorlight's shared utility library. Published via JitPack.
+          It is a library, not a plugin, so it is shaded into the jar and relocated below
+          (together with the libraries it brings in: BoostedYAML and HikariCP).
+        -->
+        <dependency>
+            <groupId>com.github.AnchorlightDev</groupId>
+            <artifactId>StoneLib</artifactId>
+            <version>${stonelib.version}</version>
         </dependency>
     </dependencies>
 
@@ -67,6 +90,23 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>${shade.plugin.version}</version>
+                <!--
+                    Shade rewrites every class it packages to apply relocations, so it needs an
+                    ASM new enough to read the bytecode on the classpath. Pin a current ASM to
+                    avoid "Unsupported class file major version" on newer toolchains.
+                -->
+                <dependencies>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                        <version>9.9.1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-commons</artifactId>
+                        <version>9.9.1</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
                     <artifactSet>
@@ -75,6 +115,24 @@
                             <exclude>org.slf4j:*</exclude>
                         </excludes>
                     </artifactSet>
+                    <!--
+                        StoneLib and the libraries it ships are relocated under the plugin's own
+                        package so two plugins bundling different versions cannot collide.
+                    -->
+                    <relocations>
+                        <relocation>
+                            <pattern>dev.anchorlight.stonelib</pattern>
+                            <shadedPattern>dev.anchorlight.blueprint.libs.stonelib</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>dev.dejvokep.boostedyaml</pattern>
+                            <shadedPattern>dev.anchorlight.blueprint.libs.boostedyaml</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>com.zaxxer.hikari</pattern>
+                            <shadedPattern>dev.anchorlight.blueprint.libs.hikari</shadedPattern>
+                        </relocation>
+                    </relocations>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>

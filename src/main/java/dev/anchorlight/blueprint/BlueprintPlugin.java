@@ -13,6 +13,7 @@ import dev.anchorlight.blueprint.service.CloneService;
 import dev.anchorlight.blueprint.service.OperationLockService;
 import dev.anchorlight.blueprint.service.SnapshotService;
 import dev.anchorlight.blueprint.service.WorldService;
+import dev.anchorlight.stonelib.update.UpdateChecker;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -45,6 +46,12 @@ public class BlueprintPlugin extends JavaPlugin {
 
     /** Single-threaded executor for all async file I/O. */
     private ExecutorService ioExecutor;
+
+    /**
+     * Result of the most recent GitHub update check, or {@code null} until it completes.
+     * Written from the async check thread and read from command threads, so it is volatile.
+     */
+    private volatile UpdateChecker.Result updateResult;
 
 
     @Override
@@ -145,8 +152,29 @@ public class BlueprintPlugin extends JavaPlugin {
             getLogger().warning("[Blueprint] Could not restore world state on startup: " + e.getMessage());
         }
 
-        // ── 8. Done ───────────────────────────────────────────────────────
+        // ── 8. Update check (async, never throws) ──────────────────────────
+        checkForUpdates();
+
+        // ── 9. Done ───────────────────────────────────────────────────────
         getLogger().info("Blueprint v" + getDescription().getVersion() + " enabled.");
+    }
+
+    /**
+     * Asynchronously checks GitHub for a newer Blueprint release and records the result
+     * for {@code /blueprint version}. Uses StoneLib's {@link UpdateChecker}, which never
+     * throws and never blocks the main thread; any failure is captured in the result.
+     */
+    private void checkForUpdates() {
+        String current = getDescription().getVersion();
+        new UpdateChecker("AnchorlightDev", "Blueprint", current).check()
+                .thenAccept(result -> {
+                    updateResult = result;
+                    if (result.succeeded() && result.outdated()) {
+                        getLogger().warning("[Blueprint] A new version is available: v"
+                                + result.latest() + " (you are on v" + result.current() + ")");
+                        getLogger().warning("[Blueprint] Download: " + result.url());
+                    }
+                });
     }
 
     @Override
@@ -180,6 +208,9 @@ public class BlueprintPlugin extends JavaPlugin {
     public SnapshotService getSnapshotService() { return snapshotService; }
     public OperationLockService getOpLocks() { return opLocks; }
     public ExecutorService getIoExecutor() { return ioExecutor; }
+
+    /** The latest GitHub update-check result, or {@code null} if it has not completed yet. */
+    public UpdateChecker.Result getUpdateResult() { return updateResult; }
 
     /**
      * Returns the Bukkit folder name for a Blueprint world.

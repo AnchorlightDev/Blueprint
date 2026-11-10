@@ -1,5 +1,5 @@
 name: Blueprint
-version: '0.1.0'
+version: '0.2.0'
 main: dev.anchorlight.blueprint.BlueprintPlugin
 api-version: '1.21'
 description: Modern build-server world management plugin for Paper
